@@ -3,7 +3,7 @@ import { useState } from "react";
 import TopNavigation from "@/components/TopNavigation";
 import BilliardTable from "@/components/BilliardTable";
 import { Button } from "@/components/ui/button";
-import { Refresh } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 
 const Practice = () => {
   const [resetKey, setResetKey] = useState(0);
@@ -28,7 +28,7 @@ const Practice = () => {
               className="border-white/20 flex items-center gap-2"
               onClick={handleResetTable}
             >
-              <Refresh className="w-4 h-4" /> Reset Table
+              <RefreshCw className="w-4 h-4" /> Reset Table
             </Button>
           </div>
           
