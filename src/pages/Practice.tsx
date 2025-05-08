@@ -35,12 +35,12 @@ const Practice = () => {
           <BilliardTable key={resetKey} isPracticeMode={true} />
           
           <div className="mt-6 glass p-4 rounded-lg max-w-lg mx-auto">
-            <h2 className="text-lg font-medium mb-3">Practice Tips</h2>
+            <h2 className="text-lg font-medium mb-3">8-Ball Rules</h2>
             <ul className="space-y-2 text-sm text-gray-300">
-              <li>• Use practice mode to perfect your shots without affecting your stats</li>
-              <li>• Try different angles and power levels to understand ball physics</li>
-              <li>• Practice bank shots by bouncing the cue ball off cushions</li>
-              <li>• Reset the table anytime to start fresh</li>
+              <li>• Break the rack and try to pocket a ball</li>
+              <li>• Your ball type (solids or stripes) is determined by the first ball you pocket</li>
+              <li>• Pocket all your balls and then the 8-ball to win</li>
+              <li>• Pocketing the 8-ball early or scratching on the 8-ball results in a loss</li>
             </ul>
           </div>
         </div>

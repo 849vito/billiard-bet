@@ -1,3 +1,4 @@
+
 import { useCallback, useEffect, useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { useGame } from "@/context/GameContext";
@@ -5,6 +6,8 @@ import { useBilliardPhysics } from '@/hooks/useBilliardPhysics';
 import { Slider } from "@/components/ui/slider";
 import { useIsMobile } from '@/hooks/use-mobile';
 import { TABLE_WIDTH, TABLE_HEIGHT, BALL_RADIUS } from '@/utils/GamePhysics';
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 interface BilliardTableProps {
   isPracticeMode?: boolean;
@@ -25,10 +28,13 @@ const BilliardTable = ({ isPracticeMode = false }: BilliardTableProps) => {
     containerRef,
     startPoweringUp,
     takeShot,
-    handleMouseMove
-  } = useBilliardPhysics();
+    handleMouseMove,
+    playerTurn,
+    playerType
+  } = useBilliardPhysics(isPracticeMode);
   
   const [aimDirection, setAimDirection] = useState(0);
+  const [focusMode, setFocusMode] = useState(false);
   
   // Handle mouse/touch interactions
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -106,6 +112,11 @@ const BilliardTable = ({ isPracticeMode = false }: BilliardTableProps) => {
       y: (y / TABLE_HEIGHT) * 100
     };
   }, []);
+
+  // Toggle focus mode
+  const toggleFocusMode = () => {
+    setFocusMode(!focusMode);
+  };
   
   return (
     <div className="w-full max-w-4xl mx-auto">
@@ -118,7 +129,7 @@ const BilliardTable = ({ isPracticeMode = false }: BilliardTableProps) => {
             </div>
             <div className="ml-2">
               <div className="text-sm font-medium">{currentMatch?.player1Username || "You"}</div>
-              <div className="text-xs text-gray-400">Solids</div>
+              <div className="text-xs text-gray-400">{playerType === 'solids' ? "Solids" : "Stripes"}</div>
             </div>
           </div>
           
@@ -130,7 +141,7 @@ const BilliardTable = ({ isPracticeMode = false }: BilliardTableProps) => {
           <div className="flex items-center">
             <div className="mr-2 text-right">
               <div className="text-sm font-medium">{currentMatch?.player2Username || "Opponent"}</div>
-              <div className="text-xs text-gray-400">Stripes</div>
+              <div className="text-xs text-gray-400">{playerType === 'solids' ? "Stripes" : "Solids"}</div>
             </div>
             <div className="w-10 h-10 rounded-full bg-pool-blue flex items-center justify-center text-white font-bold border-2 border-white/50">
               O
@@ -138,10 +149,20 @@ const BilliardTable = ({ isPracticeMode = false }: BilliardTableProps) => {
           </div>
         </div>
       ) : (
-        <div className="flex items-center justify-center glass p-3 rounded-t-lg">
+        <div className="flex items-center justify-between glass p-3 rounded-t-lg">
           <div className="text-center">
             <div className="text-sm font-medium">Practice Mode</div>
             <div className="text-xs text-pool-gold">No Stakes</div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Label htmlFor="focus-mode" className="text-sm text-gray-300">
+              Focus Mode
+            </Label>
+            <Switch 
+              id="focus-mode" 
+              checked={focusMode}
+              onCheckedChange={toggleFocusMode}
+            />
           </div>
         </div>
       )}
@@ -152,14 +173,24 @@ const BilliardTable = ({ isPracticeMode = false }: BilliardTableProps) => {
         className="table-cloth relative aspect-video rounded-b-lg border-8 border-pool-wood overflow-hidden"
         onMouseDown={handleMouseDown}
         onTouchStart={handleTouchStart}
+        style={focusMode ? { 
+          backgroundImage: 'radial-gradient(circle at center, #0691d9 0%, #054663 100%)',
+        } : {}}
       >
+        {/* Table markings */}
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute left-1/4 top-0 bottom-0 w-[1px] bg-white/10"></div>
+          <div className="absolute left-1/2 top-0 bottom-0 w-[1px] bg-white/10"></div>
+          <div className="absolute right-1/4 top-0 bottom-0 w-[1px] bg-white/10"></div>
+        </div>
+        
         {/* Pockets */}
-        <div className="absolute top-0 left-0 w-6 h-6 rounded-full bg-black"></div>
-        <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-6 h-6 rounded-full bg-black"></div>
-        <div className="absolute top-0 right-0 w-6 h-6 rounded-full bg-black"></div>
-        <div className="absolute bottom-0 left-0 w-6 h-6 rounded-full bg-black"></div>
-        <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-6 h-6 rounded-full bg-black"></div>
-        <div className="absolute bottom-0 right-0 w-6 h-6 rounded-full bg-black"></div>
+        <div className="absolute top-0 left-0 w-8 h-8 rounded-full bg-black shadow-inner transform -translate-x-1/2 -translate-y-1/2"></div>
+        <div className="absolute top-0 left-1/2 w-8 h-8 rounded-full bg-black shadow-inner transform -translate-x-1/2 -translate-y-1/2"></div>
+        <div className="absolute top-0 right-0 w-8 h-8 rounded-full bg-black shadow-inner transform translate-x-1/2 -translate-y-1/2"></div>
+        <div className="absolute bottom-0 left-0 w-8 h-8 rounded-full bg-black shadow-inner transform -translate-x-1/2 translate-y-1/2"></div>
+        <div className="absolute bottom-0 left-1/2 w-8 h-8 rounded-full bg-black shadow-inner transform -translate-x-1/2 translate-y-1/2"></div>
+        <div className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-black shadow-inner transform translate-x-1/2 translate-y-1/2"></div>
         
         {/* Trajectory guide */}
         {trajectoryPoints.length > 0 && (
@@ -182,18 +213,24 @@ const BilliardTable = ({ isPracticeMode = false }: BilliardTableProps) => {
           !ball.pocketed && (
             <div 
               key={ball.number}
-              className="absolute w-5 h-5 rounded-full transform -translate-x-1/2 -translate-y-1/2 border border-white/20 shadow-md"
+              className="absolute transform -translate-x-1/2 -translate-y-1/2 border border-white/20 shadow-md"
               style={{
                 top: `${(ball.position.y / TABLE_HEIGHT) * 100}%`,
                 left: `${(ball.position.x / TABLE_WIDTH) * 100}%`,
+                width: `${(BALL_RADIUS * 2) / TABLE_WIDTH * 100}%`,
+                height: `${(BALL_RADIUS * 2) / TABLE_HEIGHT * 100}%`,
+                borderRadius: '50%',
                 backgroundColor: ball.color,
-                zIndex: ball.number === 0 ? 10 : 5
+                zIndex: ball.number === 0 ? 10 : 5,
+                backgroundImage: ball.number > 8 ? 'linear-gradient(to bottom, white 0%, white 50%, transparent 50%, transparent 100%)' : 'none'
               }}
             >
               {ball.number > 0 && (
-                <span className="absolute inset-0 flex items-center justify-center text-xs font-bold text-white">
-                  {ball.number}
-                </span>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className={`text-xs font-bold ${ball.number > 8 ? 'text-black' : 'text-white'}`}>
+                    {ball.number}
+                  </span>
+                </div>
               )}
             </div>
           )
@@ -201,17 +238,37 @@ const BilliardTable = ({ isPracticeMode = false }: BilliardTableProps) => {
         
         {/* Cue stick when powering up */}
         {isPoweringUp && balls.find(b => b.number === 0 && !b.pocketed) && (
-          <div 
-            className="absolute h-1 bg-amber-500 rounded-full transform origin-left"
-            style={{
-              top: `${(balls.find(b => b.number === 0)?.position.y || 0) / TABLE_HEIGHT * 100}%`,
-              left: `${(balls.find(b => b.number === 0)?.position.x || 0) / TABLE_WIDTH * 100}%`,
-              width: `${20 + power * 0.5}%`,
-              transform: `translateY(-50%) rotate(${aimAngle + aimDirection / 100}rad) translateX(-95%)`,
-              zIndex: 20
-            }}
-          ></div>
+          <>
+            {/* Cue stick base */}
+            <div 
+              className="absolute h-1 bg-gradient-to-r from-amber-900 to-amber-600 rounded-full transform origin-left"
+              style={{
+                top: `${(balls.find(b => b.number === 0)?.position.y || 0) / TABLE_HEIGHT * 100}%`,
+                left: `${(balls.find(b => b.number === 0)?.position.x || 0) / TABLE_WIDTH * 100}%`,
+                width: `${30 + power * 0.5}%`,
+                transform: `translateY(-50%) rotate(${aimAngle + aimDirection / 100}rad) translateX(-98%)`,
+                zIndex: 20
+              }}
+            ></div>
+            
+            {/* Cue tip */}
+            <div 
+              className="absolute h-2 w-3 bg-blue-200 rounded-sm transform origin-right"
+              style={{
+                top: `${(balls.find(b => b.number === 0)?.position.y || 0) / TABLE_HEIGHT * 100}%`,
+                left: `${(balls.find(b => b.number === 0)?.position.x || 0) / TABLE_WIDTH * 100}%`,
+                transform: `translateY(-50%) rotate(${aimAngle + aimDirection / 100}rad) translateX(${-(30 + power * 0.5)}%)`,
+                zIndex: 21
+              }}
+            ></div>
+          </>
         )}
+        
+        {/* Turn indicator */}
+        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 glass px-4 py-2 rounded-full text-sm flex items-center gap-2">
+          <div className={`w-3 h-3 rounded-full ${playerTurn === 'player' ? 'bg-green-500' : 'bg-red-500'}`}></div>
+          <span>{playerTurn === 'player' ? 'Your Turn' : 'Opponent Turn'}</span>
+        </div>
         
         {/* Message overlay */}
         <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 glass px-4 py-2 rounded-full text-sm">
@@ -221,11 +278,62 @@ const BilliardTable = ({ isPracticeMode = false }: BilliardTableProps) => {
         {/* Power meter */}
         <div className="absolute bottom-4 right-4 glass p-2 rounded-lg">
           <div className="text-xs mb-1 text-center">Power</div>
-          <div className="w-32 h-3 bg-gray-700 rounded-full overflow-hidden">
+          <div className="w-32 h-4 bg-gray-900 rounded-full overflow-hidden">
             <div 
-              className="h-full bg-gradient-to-r from-green-500 via-yellow-500 to-red-500"
+              className="h-full bg-gradient-to-r from-green-500 via-yellow-500 to-red-500 transition-all"
               style={{ width: `${power}%` }}
             ></div>
+          </div>
+        </div>
+        
+        {/* Instructions overlay for focus mode */}
+        {focusMode && (
+          <div className="absolute inset-0 flex items-center justify-center text-center text-white text-xl font-bold opacity-30 pointer-events-none">
+            <div>
+              Press button, drag mouse, and release
+              <div className="text-base mt-4">to apply power to the cue</div>
+            </div>
+          </div>
+        )}
+        
+        {/* Pocket preview */}
+        <div className="absolute top-10 right-4 glass p-2 rounded-lg">
+          <div className="flex gap-1">
+            {Array.from({ length: 7 }).map((_, i) => (
+              <div 
+                key={`solid-${i+1}`} 
+                className="w-4 h-4 rounded-full" 
+                style={{ 
+                  backgroundColor: balls.find(b => b.number === i+1)?.pocketed ? 'transparent' : balls.find(b => b.number === i+1)?.color,
+                  opacity: balls.find(b => b.number === i+1)?.pocketed ? 0.3 : 1,
+                  border: balls.find(b => b.number === i+1)?.pocketed ? '1px solid white' : 'none'
+                }}
+              >
+                {!balls.find(b => b.number === i+1)?.pocketed && (
+                  <span className="text-[8px] flex items-center justify-center h-full text-white">{i+1}</span>
+                )}
+              </div>
+            ))}
+          </div>
+          <div className="flex gap-1 mt-1">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div 
+                key={`stripe-${i+8}`} 
+                className="w-4 h-4 rounded-full overflow-hidden" 
+                style={{ 
+                  backgroundColor: balls.find(b => b.number === i+8)?.pocketed ? 'transparent' : balls.find(b => b.number === i+8)?.color,
+                  opacity: balls.find(b => b.number === i+8)?.pocketed ? 0.3 : 1,
+                  border: balls.find(b => b.number === i+8)?.pocketed ? '1px solid white' : 'none'
+                }}
+              >
+                {!balls.find(b => b.number === i+8)?.pocketed && (
+                  <>
+                    <div className="bg-white h-[50%] w-full"></div>
+                    <span className="text-[8px] absolute inset-0 flex items-center justify-center text-black">{i+8}</span>
+                  </>
+                )}
+              </div>
+            ))}
           </div>
         </div>
       </div>
@@ -235,8 +343,8 @@ const BilliardTable = ({ isPracticeMode = false }: BilliardTableProps) => {
         <Button variant="ghost" className="glass" onClick={() => adjustAim('left')}>
           Aim Left
         </Button>
-        <Button variant="ghost" className="glass">
-          Change View
+        <Button variant="ghost" className="glass" onClick={toggleFocusMode}>
+          {focusMode ? "Normal View" : "Focus Mode"}
         </Button>
         <Button variant="ghost" className="glass" onClick={() => adjustAim('right')}>
           Aim Right
@@ -246,9 +354,10 @@ const BilliardTable = ({ isPracticeMode = false }: BilliardTableProps) => {
       <div className="mt-2 glass p-3 rounded-lg">
         <div className="text-sm mb-2">Game Controls:</div>
         <div className="text-xs text-gray-300 space-y-1">
-          <p>• Click and hold to power up your shot</p>
+          <p>• Click and hold on the cue ball to aim</p>
+          <p>• Drag away from the cue ball to increase power</p>
           <p>• Release to take the shot</p>
-          <p>• Use the buttons to adjust aim</p>
+          <p>• Use Focus Mode for better precision</p>
         </div>
       </div>
     </div>

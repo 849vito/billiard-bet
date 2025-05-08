@@ -1,6 +1,6 @@
-
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Matter from 'matter-js';
+import { toast } from 'sonner';
 import { 
   setupTable, 
   createBalls, 
@@ -9,7 +9,8 @@ import {
   BALL_RADIUS,
   TABLE_WIDTH,
   TABLE_HEIGHT,
-  BALL_COLORS
+  BALL_COLORS,
+  BallType
 } from '@/utils/GamePhysics';
 
 type BallState = {
@@ -20,8 +21,10 @@ type BallState = {
 };
 
 type GameState = 'waiting' | 'aiming' | 'shooting' | 'opponent-turn' | 'game-over';
+type PlayerType = 'solids' | 'stripes' | null;
+type PlayerTurn = 'player' | 'opponent';
 
-export const useBilliardPhysics = () => {
+export const useBilliardPhysics = (isPracticeMode: boolean = false) => {
   const [power, setPower] = useState(0);
   const [isPoweringUp, setIsPoweringUp] = useState(false);
   const [balls, setBalls] = useState<BallState[]>([]);
@@ -29,6 +32,10 @@ export const useBilliardPhysics = () => {
   const [message, setMessage] = useState("Your turn! Click and hold to power up the shot.");
   const [aimAngle, setAimAngle] = useState(0);
   const [showTrajectory, setShowTrajectory] = useState(false);
+  const [playerType, setPlayerType] = useState<PlayerType>(null);
+  const [playerTurn, setPlayerTurn] = useState<PlayerTurn>('player');
+  const [legalBreak, setLegalBreak] = useState(false);
+  const [gameInitialized, setGameInitialized] = useState(false);
   
   // Refs for matter.js objects
   const engineRef = useRef<Matter.Engine | null>(null);
@@ -41,6 +48,11 @@ export const useBilliardPhysics = () => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const initialMouseRef = useRef<{ x: number, y: number } | null>(null);
   const currentMouseRef = useRef<{ x: number, y: number } | null>(null);
+  
+  // Game state refs
+  const lastPocketedBallRef = useRef<number | null>(null);
+  const breakShotRef = useRef(true);
+  const turnEndedRef = useRef(false);
   
   // Setup the physics world
   const initPhysics = useCallback(() => {
@@ -97,6 +109,14 @@ export const useBilliardPhysics = () => {
     
     setBalls(ballsState);
     
+    // Reset game state
+    setPlayerType(null);
+    setPlayerTurn('player');
+    breakShotRef.current = true;
+    turnEndedRef.current = false;
+    lastPocketedBallRef.current = null;
+    setLegalBreak(false);
+    
     // Setup collision detection for pockets
     Matter.Events.on(engine, 'collisionStart', (event) => {
       const pairs = event.pairs;
@@ -109,6 +129,9 @@ export const useBilliardPhysics = () => {
           const ball = pair.bodyB;
           const ballNumber = parseInt(ball.label.split('-')[1], 10);
           
+          // Track the last pocketed ball
+          lastPocketedBallRef.current = ballNumber;
+          
           // Make ball inactive and update state
           Matter.World.remove(world, ball);
           
@@ -120,9 +143,29 @@ export const useBilliardPhysics = () => {
             )
           );
           
+          // On break shot, check if any balls were pocketed or hit the rails
+          if (breakShotRef.current) {
+            if (ballNumber !== 0) {
+              setLegalBreak(true);
+            }
+            
+            // Determine player type based on first pocketed ball
+            if (ballNumber > 0 && ballNumber < 8 && playerType === null) {
+              setPlayerType('solids');
+              toast.success("You are assigned Solid balls (1-7)");
+            } else if (ballNumber > 8 && playerType === null) {
+              setPlayerType('stripes');
+              toast.success("You are assigned Striped balls (9-15)");
+            }
+          }
+          
           // Special handling for the cue ball (respawn it)
           if (ballNumber === 0) {
             setMessage("Scratch! Cue ball will be respawned.");
+            toast.error("You scratched! Turn will pass to opponent.");
+            
+            // Turn ends when you pocket the cue ball
+            turnEndedRef.current = true;
             
             // Wait a moment, then respawn cue ball
             setTimeout(() => {
@@ -163,12 +206,52 @@ export const useBilliardPhysics = () => {
                 )
               );
               
-              setMessage("Your turn again!");
+              // In practice mode, don't switch turns
+              if (isPracticeMode) {
+                setMessage("Your turn again!");
+              } else {
+                // Switch turns
+                setPlayerTurn('opponent');
+                setMessage("Opponent's turn");
+              }
             }, 1500);
           } else if (ballNumber === 8) {
             // 8-ball handling
-            setMessage("8-ball pocketed! Game over!");
-            setGameState('game-over');
+            const solidsRemaining = balls.filter(b => b.number > 0 && b.number < 8 && !b.pocketed).length;
+            const stripesRemaining = balls.filter(b => b.number > 8 && !b.pocketed).length;
+            
+            if ((playerType === 'solids' && solidsRemaining === 0) || 
+                (playerType === 'stripes' && stripesRemaining === 0)) {
+              setMessage("8-ball pocketed! You win!");
+              toast.success("You win! All your balls and the 8-ball were pocketed.");
+              setGameState('game-over');
+            } else {
+              setMessage("8-ball pocketed too early! You lose!");
+              toast.error("You lost! You pocketed the 8-ball before clearing your balls.");
+              setGameState('game-over');
+            }
+          } else {
+            // Regular ball pocketed
+            const ballTypePocketed = ballNumber < 8 ? 'solids' : 'stripes';
+            
+            // In practice mode, always allow player to keep shooting
+            if (isPracticeMode) {
+              setMessage(`Ball ${ballNumber} pocketed! Continue your turn.`);
+            } else {
+              // First pocketed ball determines player type if not already set
+              if (playerType === null) {
+                setPlayerType(ballTypePocketed);
+                toast.success(`You are assigned ${ballTypePocketed === 'solids' ? 'Solid' : 'Striped'} balls`);
+              }
+              
+              // Check if player pocketed the right type
+              if (playerType === ballTypePocketed) {
+                setMessage(`Ball ${ballNumber} pocketed! You can shoot again.`);
+              } else {
+                setMessage(`Ball ${ballNumber} pocketed! Opponent's ball.`);
+                turnEndedRef.current = true;
+              }
+            }
           }
         }
       }
@@ -183,8 +266,56 @@ export const useBilliardPhysics = () => {
         }));
         
         if (allStopped) {
-          setMessage("Your turn! Click and hold to power up the shot.");
-          setGameState('waiting');
+          // Break shot is over
+          if (breakShotRef.current) {
+            breakShotRef.current = false;
+            
+            // Check if it was a legal break
+            if (!legalBreak && !isPracticeMode) {
+              setMessage("Illegal break! No balls pocketed or hit cushions.");
+              turnEndedRef.current = true;
+            }
+          }
+          
+          if (isPracticeMode) {
+            setMessage("Your turn! Click and hold to power up the shot.");
+            setGameState('waiting');
+          } else {
+            // Check if turn should end
+            if (turnEndedRef.current) {
+              setPlayerTurn(prev => prev === 'player' ? 'opponent' : 'player');
+              turnEndedRef.current = false;
+              
+              if (playerTurn === 'player') {
+                setGameState('opponent-turn');
+                setMessage("Opponent's turn");
+                
+                // Simulate opponent's turn after delay
+                if (playerTurn === 'player') {
+                  setTimeout(() => {
+                    simulateOpponentShot();
+                  }, 2000);
+                }
+              } else {
+                setGameState('waiting');
+                setMessage("Your turn! Click and hold to power up the shot.");
+              }
+            } else {
+              // Player gets to continue their turn
+              if (playerTurn === 'player') {
+                setGameState('waiting');
+                setMessage("Your turn! Click and hold to power up the shot.");
+              } else {
+                setGameState('opponent-turn');
+                setMessage("Opponent's turn");
+                
+                // Simulate opponent's turn after delay
+                setTimeout(() => {
+                  simulateOpponentShot();
+                }, 2000);
+              }
+            }
+          }
         }
       }
       
@@ -213,15 +344,44 @@ export const useBilliardPhysics = () => {
     
     setGameState('waiting');
     setMessage("Your turn! Click and hold to power up the shot.");
+    setGameInitialized(true);
     
     return () => {
       clearInterval(updateInterval);
     };
-  }, [gameState]);
+  }, [gameState, isPracticeMode, legalBreak, playerTurn, playerType, balls]);
+  
+  // Simulate opponent's turn (for non-practice mode)
+  const simulateOpponentShot = useCallback(() => {
+    if (!worldRef.current) return;
+    
+    // Find cue ball
+    const cueBall = ballBodiesRef.current.find(ball => ball.label === 'ball-0');
+    if (!cueBall) return;
+    
+    // Simulate a random shot
+    const randomAngle = Math.random() * Math.PI * 2;
+    const randomPower = 30 + Math.random() * 40;
+    
+    const force = {
+      x: Math.cos(randomAngle) * randomPower * 0.05,
+      y: Math.sin(randomAngle) * randomPower * 0.05
+    };
+    
+    // Apply the force
+    Matter.Body.applyForce(cueBall, cueBall.position, force);
+    setGameState('shooting');
+    setMessage("Opponent is shooting...");
+    
+    // Always end opponent's turn after their shot
+    turnEndedRef.current = true;
+  }, []);
   
   // Initialize game on component mount and when container size changes
   useEffect(() => {
-    initPhysics();
+    if (!gameInitialized) {
+      initPhysics();
+    }
     
     // Handle window resize
     const handleResize = () => {
@@ -246,11 +406,11 @@ export const useBilliardPhysics = () => {
         cancelAnimationFrame(requestRef.current);
       }
     };
-  }, [initPhysics]);
+  }, [initPhysics, gameInitialized]);
   
   // Power up the shot
   const startPoweringUp = useCallback((x: number, y: number) => {
-    if (gameState !== 'waiting') return;
+    if (gameState !== 'waiting' || playerTurn !== 'player') return;
     
     setGameState('aiming');
     setIsPoweringUp(true);
@@ -270,7 +430,7 @@ export const useBilliardPhysics = () => {
     }, 50);
     
     return powerInterval;
-  }, [gameState]);
+  }, [gameState, playerTurn]);
   
   // Take the shot
   const takeShot = useCallback(() => {
@@ -359,6 +519,29 @@ export const useBilliardPhysics = () => {
   // Calculate the aim guide line
   const trajectoryPoints = calculateTrajectoryPoints();
   
+  // Reset the game
+  const resetGame = useCallback(() => {
+    initPhysics();
+  }, [initPhysics]);
+  
+  // Check game state
+  useEffect(() => {
+    const checkWinCondition = () => {
+      // Only check in actual game mode (not practice)
+      if (isPracticeMode || playerType === null) return;
+      
+      const solidsRemaining = balls.filter(b => b.number > 0 && b.number < 8 && !b.pocketed).length;
+      const stripesRemaining = balls.filter(b => b.number > 8 && !b.pocketed).length;
+      
+      if ((playerType === 'solids' && solidsRemaining === 0) || 
+          (playerType === 'stripes' && stripesRemaining === 0)) {
+        setMessage("You've pocketed all your balls! Now sink the 8-ball to win.");
+      }
+    };
+    
+    checkWinCondition();
+  }, [balls, isPracticeMode, playerType]);
+  
   // Interface for controlling the game
   return {
     balls,
@@ -373,6 +556,9 @@ export const useBilliardPhysics = () => {
     startPoweringUp,
     takeShot,
     handleMouseMove,
-    showTrajectory
+    showTrajectory,
+    playerType,
+    playerTurn,
+    resetGame
   };
 };

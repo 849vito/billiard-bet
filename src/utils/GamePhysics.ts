@@ -21,7 +21,7 @@ export enum BallType {
 // Ball colors
 export const BALL_COLORS = {
   0: 'white', // Cue ball
-  1: 'yellow',
+  1: 'gold',
   2: 'blue',
   3: 'red',
   4: 'purple',
@@ -29,7 +29,7 @@ export const BALL_COLORS = {
   6: 'green',
   7: 'brown',
   8: 'black', // Eight ball
-  9: 'yellow',
+  9: 'gold',
   10: 'blue',
   11: 'red',
   12: 'purple',
@@ -155,6 +155,35 @@ export const setupTable = () => {
   return { engine, world: engine.world, cushions, pockets };
 };
 
+// Function for perfect triangular rack formation
+const createRackFormation = (startX: number, startY: number) => {
+  const positions = [];
+  const spacing = BALL_RADIUS * 2.1; // Slightly larger than diameter for proper spacing
+  const rows = 5;
+  
+  // Ball placement order for 8-ball (4 alternating stripes/solids, 8-ball in center, rest alternating)
+  const ballOrder = [1, 9, 2, 10, 8, 11, 3, 13, 4, 15, 5, 14, 6, 12, 7];
+  let ballIndex = 0;
+  
+  for (let row = 0; row < rows; row++) {
+    for (let pos = 0; pos <= row; pos++) {
+      const x = startX + row * spacing * Math.cos(Math.PI / 6);
+      const y = startY + (pos - row / 2) * spacing;
+      
+      if (ballIndex < ballOrder.length) {
+        positions.push({
+          number: ballOrder[ballIndex],
+          x,
+          y
+        });
+        ballIndex++;
+      }
+    }
+  }
+  
+  return positions;
+};
+
 // Create balls
 export const createBalls = () => {
   const balls = [];
@@ -180,53 +209,27 @@ export const createBalls = () => {
   // Starting position for the rack
   const rackX = TABLE_WIDTH * 0.75;
   const rackY = TABLE_HEIGHT / 2;
-  const spacing = BALL_RADIUS * 2.1; // Slightly larger than diameter for proper spacing
   
-  // 8 ball is in the center of the third row
-  const eightBall = Bodies.circle(
-    rackX + spacing * 2,
-    rackY,
-    BALL_RADIUS,
-    {
-      restitution: RESTITUTION,
-      friction: FRICTION,
-      frictionAir: 0.015,
-      density: 0.8,
-      label: 'ball-8',
-      render: { fillStyle: BALL_COLORS[8] }
-    }
-  );
-  balls.push(eightBall);
+  // Get optimal rack positions
+  const rackPositions = createRackFormation(rackX, rackY);
   
-  // Create other balls in rack formation
-  let ballIndex = 1;
-  for (let row = 0; row < 5; row++) {
-    for (let pos = 0; pos <= row; pos++) {
-      // Skip the middle position of the third row (where the 8 ball goes)
-      if (row === 2 && pos === 1) continue;
-      
-      const x = rackX + row * spacing * Math.cos(Math.PI / 6);
-      const y = rackY + (pos - row / 2) * spacing;
-      
-      if (ballIndex > 15) break;
-      
-      const ball = Bodies.circle(
-        x,
-        y,
-        BALL_RADIUS,
-        {
-          restitution: RESTITUTION,
-          friction: FRICTION,
-          frictionAir: 0.015,
-          density: 0.8,
-          label: `ball-${ballIndex}`,
-          render: { fillStyle: BALL_COLORS[ballIndex] }
-        }
-      );
-      balls.push(ball);
-      ballIndex++;
-    }
-  }
+  // Create balls in rack formation
+  rackPositions.forEach(position => {
+    const ball = Bodies.circle(
+      position.x,
+      position.y,
+      BALL_RADIUS,
+      {
+        restitution: RESTITUTION,
+        friction: FRICTION,
+        frictionAir: 0.015,
+        density: 0.8,
+        label: `ball-${position.number}`,
+        render: { fillStyle: BALL_COLORS[position.number] }
+      }
+    );
+    balls.push(ball);
+  });
   
   return balls;
 };
@@ -264,6 +267,23 @@ export const allBallsStopped = (balls: Matter.Body[]): boolean => {
   });
 };
 
+// Function to calculate ball statistics
+export const calculateBallStats = (balls: Array<{number: number, pocketed: boolean}>) => {
+  const solidsPocketed = balls.filter(b => b.number > 0 && b.number < 8 && b.pocketed).length;
+  const stripesPocketed = balls.filter(b => b.number > 8 && b.pocketed).length;
+  const solidsRemaining = 7 - solidsPocketed;
+  const stripesRemaining = 7 - stripesPocketed;
+  const eightBallPocketed = balls.find(b => b.number === 8)?.pocketed || false;
+  
+  return {
+    solidsPocketed,
+    stripesPocketed,
+    solidsRemaining,
+    stripesRemaining,
+    eightBallPocketed
+  };
+};
+
 // Function to create collision filtering for balls
 export const setupCollisionFilter = () => {
   return {
@@ -272,4 +292,3 @@ export const setupCollisionFilter = () => {
     mask: 0x0001
   };
 };
-
