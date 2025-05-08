@@ -73,32 +73,28 @@ const TrajectoryGuide = ({ points, showGuide }: TrajectoryGuideProps) => {
     };
   };
   
-  // Create a dashed gradient line for better visibility on different felt colors
-  const createDashedLine = (index: number) => {
-    const { x1, y1, x2, y2 } = calculateOffsets(index);
-    
-    return (
-      <line
-        key={`line-${index}`}
-        x1={x1}
-        y1={y1}
-        x2={x2}
-        y2={y2}
-        stroke={index === 0 ? "rgba(255,255,255,0.8)" : "rgba(255,255,255,0.6)"}
-        strokeWidth={index === 0 ? "2" : "1.5"}
-        strokeDasharray={index === 0 ? "5,3" : "4,2"}
-      />
-    );
-  };
-  
   return (
     <>
       <svg className="absolute inset-0 w-full h-full pointer-events-none z-10">
         {/* First line segment - from cue ball to first collision */}
-        {createDashedLine(0)}
+        <line
+          {...calculateOffsets(0)}
+          stroke="white"
+          strokeWidth="2"
+          strokeDasharray="5,3"
+          strokeOpacity="0.8"
+        />
         
         {/* If there are more points, draw the post-collision trajectory */}
-        {normalizedPoints.length > 2 && createDashedLine(1)}
+        {normalizedPoints.length > 2 && (
+          <line
+            {...calculateOffsets(1)}
+            stroke="white"
+            strokeWidth="1.5"
+            strokeDasharray="4,2"
+            strokeOpacity="0.6"
+          />
+        )}
       </svg>
       
       {renderCollisionPoint()}
