@@ -1,121 +1,150 @@
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 
 interface EnglishControlProps {
   onChange: (english: { x: number, y: number }) => void;
 }
 
 const EnglishControl = ({ onChange }: EnglishControlProps) => {
-  const [english, setEnglish] = useState<{ x: number, y: number }>({ x: 0, y: 0 });
-
-  // Handle click or drag on the english control
-  const handleInteraction = (e: React.MouseEvent<HTMLDivElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width) * 2 - 1; // -1 to 1
-    const y = ((e.clientY - rect.top) / rect.height) * 2 - 1; // -1 to 1
-    
-    // Clamp values to ensure they're within a circle
-    const length = Math.sqrt(x * x + y * y);
-    const normalizedX = length > 1 ? x / length : x;
-    const normalizedY = length > 1 ? y / length : y;
-    
-    setEnglish({ x: normalizedX, y: normalizedY });
-    onChange({ x: normalizedX, y: normalizedY });
-  };
-
-  // Reset english to center
-  const resetEnglish = () => {
-    setEnglish({ x: 0, y: 0 });
-    onChange({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const controlRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  
+  // Reset position on mount
+  useEffect(() => {
+    setPosition({ x: 0, y: 0 });
+  }, []);
+  
+  // Handle mouse/touch down event
+  const handleStart = (clientX: number, clientY: number) => {
+    if (!containerRef.current) return;
+    setIsDragging(true);
+    updatePosition(clientX, clientY);
   };
   
-  // Track mouse movement for dragging
-  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    handleInteraction(e);
+  // Update the position of the control
+  const updatePosition = (clientX: number, clientY: number) => {
+    if (!containerRef.current) return;
     
+    const rect = containerRef.current.getBoundingClientRect();
+    
+    // Calculate center of the control area
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+    
+    // Calculate position relative to center
+    let x = (clientX - rect.left - centerX) / centerX;
+    let y = (clientY - rect.top - centerY) / centerY;
+    
+    // Limit values to -1 to 1 (within the circle)
+    const distance = Math.sqrt(x * x + y * y);
+    if (distance > 1) {
+      x /= distance;
+      y /= distance;
+    }
+    
+    // Invert Y axis so positive is up
+    y = -y;
+    
+    setPosition({ x, y });
+    onChange({ x, y });
+  };
+  
+  // Handle mouse/touch move events
+  const handleMove = (clientX: number, clientY: number) => {
+    if (!isDragging) return;
+    updatePosition(clientX, clientY);
+  };
+  
+  // Handle mouse/touch up event
+  const handleEnd = () => {
+    setIsDragging(false);
+  };
+  
+  // Add mouse event handlers
+  useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
-      const rect = e.currentTarget as HTMLDivElement;
-      const boundingRect = rect.getBoundingClientRect();
-      const x = ((e.clientX - boundingRect.left) / boundingRect.width) * 2 - 1;
-      const y = ((e.clientY - boundingRect.top) / boundingRect.height) * 2 - 1;
-      
-      // Clamp values to ensure they're within a circle
-      const length = Math.sqrt(x * x + y * y);
-      const normalizedX = length > 1 ? x / length : x;
-      const normalizedY = length > 1 ? y / length : y;
-      
-      setEnglish({ x: normalizedX, y: normalizedY });
-      onChange({ x: normalizedX, y: normalizedY });
+      handleMove(e.clientX, e.clientY);
     };
     
     const handleMouseUp = () => {
-      document.removeEventListener('mousemove', handleMouseMove as any);
-      document.removeEventListener('mouseup', handleMouseUp);
+      handleEnd();
     };
     
-    document.addEventListener('mousemove', handleMouseMove as any);
-    document.addEventListener('mouseup', handleMouseUp);
-  };
-
-  // English terminology explanations for better user understanding
-  const getEnglishDescription = () => {
-    if (Math.abs(english.x) < 0.2 && Math.abs(english.y) < 0.2) {
-      return "Center";
+    if (isDragging) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
     }
     
-    let description = "";
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging]);
+  
+  // Add touch event handlers
+  useEffect(() => {
+    const handleTouchMove = (e: TouchEvent) => {
+      if (e.touches && e.touches[0]) {
+        handleMove(e.touches[0].clientX, e.touches[0].clientY);
+      }
+    };
     
-    if (english.y < -0.3) description += "Draw";
-    else if (english.y > 0.3) description += "Follow";
+    const handleTouchEnd = () => {
+      handleEnd();
+    };
     
-    if (english.x < -0.3) description += description ? " Left" : "Left";
-    else if (english.x > 0.3) description += description ? " Right" : "Right";
+    if (isDragging) {
+      document.addEventListener('touchmove', handleTouchMove);
+      document.addEventListener('touchend', handleTouchEnd);
+    }
     
-    return description || "Slight English";
+    return () => {
+      document.removeEventListener('touchmove', handleTouchMove);
+      document.removeEventListener('touchend', handleTouchEnd);
+    };
+  }, [isDragging]);
+  
+  // Calculate control dot position
+  const controlPosition = {
+    left: `${(position.x * 50) + 50}%`,
+    top: `${(-position.y * 50) + 50}%`
   };
-
+  
   return (
-    <div className="english-control glass p-2 rounded-lg">
-      <div className="text-xs mb-1 text-center">English Control</div>
-      <div 
-        className="w-20 h-20 bg-gray-900 rounded-full relative cursor-pointer"
-        onClick={handleInteraction}
-        onMouseDown={handleMouseDown}
-      >
-        {/* Guide circles */}
-        <div className="absolute top-1/2 left-1/2 w-3/4 h-3/4 rounded-full border border-gray-600 transform -translate-x-1/2 -translate-y-1/2"></div>
-        <div className="absolute top-1/2 left-1/2 w-2/4 h-2/4 rounded-full border border-gray-600 transform -translate-x-1/2 -translate-y-1/2"></div>
+    <div 
+      className="relative glass p-2 rounded-lg" 
+      ref={containerRef} 
+      onMouseDown={(e) => handleStart(e.clientX, e.clientY)}
+      onTouchStart={(e) => {
+        if (e.touches && e.touches[0]) {
+          handleStart(e.touches[0].clientX, e.touches[0].clientY);
+        }
+      }}
+    >
+      <div className="text-xs text-center mb-1">English (Spin)</div>
+      <div className="w-24 h-24 rounded-full border border-white/30 flex items-center justify-center relative">
+        {/* Crosshairs */}
+        <div className="absolute top-0 bottom-0 left-1/2 w-px bg-white/20"></div>
+        <div className="absolute left-0 right-0 top-1/2 h-px bg-white/20"></div>
         
-        {/* Grid lines */}
-        <div className="absolute top-1/2 left-0 right-0 h-px bg-gray-600"></div>
-        <div className="absolute bottom-0 top-0 left-1/2 w-px bg-gray-600"></div>
-        
-        {/* Dot indicator */}
+        {/* Control dot */}
         <div 
-          className="w-4 h-4 bg-white rounded-full absolute transform -translate-x-1/2 -translate-y-1/2 flex items-center justify-center"
-          style={{ 
-            left: `${(english.x + 1) * 50}%`, 
-            top: `${(english.y + 1) * 50}%`,
-            boxShadow: "0 0 6px rgba(255,255,255,0.5)"
-          }}
-        >
-          <div className="w-1.5 h-1.5 bg-red-500 rounded-full"></div>
-        </div>
+          ref={controlRef}
+          className="absolute w-4 h-4 bg-white rounded-full transform -translate-x-1/2 -translate-y-1/2 cursor-move"
+          style={controlPosition}
+        ></div>
         
-        {/* Center dot */}
-        <div className="w-2 h-2 bg-red-500 rounded-full absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2"></div>
+        {/* Labels */}
+        <span className="absolute text-[10px] text-white/50 left-1 top-1">Top-Left</span>
+        <span className="absolute text-[10px] text-white/50 right-1 top-1">Top-Right</span>
+        <span className="absolute text-[10px] text-white/50 left-1 bottom-1">Bottom-Left</span>
+        <span className="absolute text-[10px] text-white/50 right-1 bottom-1">Bottom-Right</span>
       </div>
-      
-      <div className="text-xs text-center mt-1 h-4 text-gray-300">
-        {getEnglishDescription()}
+      <div className="text-[10px] text-center mt-1 text-gray-400">
+        X: {position.x.toFixed(2)}, Y: {position.y.toFixed(2)}
       </div>
-      
-      <button 
-        className="w-full mt-1 text-xs py-1 bg-gray-800 hover:bg-gray-700 rounded"
-        onClick={resetEnglish}
-      >
-        Reset
-      </button>
     </div>
   );
 };
