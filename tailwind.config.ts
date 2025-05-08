@@ -1,3 +1,4 @@
+
 import type { Config } from "tailwindcss";
 
 export default {
@@ -52,6 +53,16 @@ export default {
 					DEFAULT: 'hsl(var(--card))',
 					foreground: 'hsl(var(--card-foreground))'
 				},
+				pool: {
+					blue: '#1e3a5f',
+					'blue-dark': '#162a43',
+					felt: '#0e6ba8',
+					'felt-dark': '#074e7e',
+					wood: '#8B4513',
+					'wood-dark': '#6e370f',
+					gold: '#ffd700',
+					'gold-dark': '#b8a000'
+				},
 				sidebar: {
 					DEFAULT: 'hsl(var(--sidebar-background))',
 					foreground: 'hsl(var(--sidebar-foreground))',
@@ -84,11 +95,26 @@ export default {
 					to: {
 						height: '0'
 					}
+				},
+				'cue-power': {
+					'0%': { transform: 'scaleX(0)' },
+					'100%': { transform: 'scaleX(1)' }
+				},
+				'pulse-soft': {
+					'0%, 100%': { opacity: '1' },
+					'50%': { opacity: '0.7' }
+				},
+				'slide-in': {
+					'0%': { transform: 'translateY(100%)' },
+					'100%': { transform: 'translateY(0)' }
 				}
 			},
 			animation: {
 				'accordion-down': 'accordion-down 0.2s ease-out',
-				'accordion-up': 'accordion-up 0.2s ease-out'
+				'accordion-up': 'accordion-up 0.2s ease-out',
+				'cue-power': 'cue-power 1s ease-in-out',
+				'pulse-soft': 'pulse-soft 2s infinite ease-in-out',
+				'slide-in': 'slide-in 0.3s ease-out'
 			}
 		}
 	},
