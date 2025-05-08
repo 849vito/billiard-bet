@@ -42,6 +42,89 @@ export type Database = {
         }
         Relationships: []
       }
+      practice_sessions: {
+        Row: {
+          balls_pocketed: number | null
+          created_at: string
+          duration: number | null
+          end_time: string | null
+          id: string
+          shots_taken: number | null
+          start_time: string
+          user_id: string
+        }
+        Insert: {
+          balls_pocketed?: number | null
+          created_at?: string
+          duration?: number | null
+          end_time?: string | null
+          id?: string
+          shots_taken?: number | null
+          start_time?: string
+          user_id: string
+        }
+        Update: {
+          balls_pocketed?: number | null
+          created_at?: string
+          duration?: number | null
+          end_time?: string | null
+          id?: string
+          shots_taken?: number | null
+          start_time?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      practice_shots: {
+        Row: {
+          angle: number
+          balls_hit: number[] | null
+          balls_pocketed: number[] | null
+          english_x: number | null
+          english_y: number | null
+          id: string
+          power: number
+          session_id: string
+          successful: boolean | null
+          timestamp: string
+          user_id: string
+        }
+        Insert: {
+          angle: number
+          balls_hit?: number[] | null
+          balls_pocketed?: number[] | null
+          english_x?: number | null
+          english_y?: number | null
+          id?: string
+          power: number
+          session_id: string
+          successful?: boolean | null
+          timestamp?: string
+          user_id: string
+        }
+        Update: {
+          angle?: number
+          balls_hit?: number[] | null
+          balls_pocketed?: number[] | null
+          english_x?: number | null
+          english_y?: number | null
+          id?: string
+          power?: number
+          session_id?: string
+          successful?: boolean | null
+          timestamp?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "practice_shots_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "practice_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar: string | null

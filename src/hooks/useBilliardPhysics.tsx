@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Matter from 'matter-js';
 import { toast } from "sonner";
@@ -13,6 +14,8 @@ import {
   BallType
 } from '@/utils/GamePhysics';
 import { applyEnglish, calculateTrajectoryPath, findFirstCollisionBall, simulateCueStrike } from '@/utils/BallPhysics';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/context/AuthContext';
 
 type BallState = {
   number: number;
@@ -25,7 +28,12 @@ type BallState = {
 type GameState = 'waiting' | 'aiming' | 'shooting' | 'opponent-turn' | 'game-over';
 type PlayerTurn = 'player' | 'opponent';
 
-export const useBilliardPhysics = (isPracticeMode: boolean = false) => {
+type UseBilliardPhysicsProps = {
+  onShotTaken?: () => void;
+  onBallPocketed?: (ballNumber: number) => void;
+};
+
+export const useBilliardPhysics = (isPracticeMode: boolean = false, props?: UseBilliardPhysicsProps) => {
   const [power, setPower] = useState(0);
   const [isPoweringUp, setIsPoweringUp] = useState(false);
   const [balls, setBalls] = useState<BallState[]>([]);
@@ -40,6 +48,7 @@ export const useBilliardPhysics = (isPracticeMode: boolean = false) => {
   const [eightBallPocketable, setEightBallPocketable] = useState(false);
   const [isBreakShot, setIsBreakShot] = useState(true);
   const [trajectoryPoints, setTrajectoryPoints] = useState<Array<{x: number, y: number}>>([]);
+  const { user, isAuthenticated } = useAuth();
   
   // Refs for matter.js objects
   const engineRef = useRef<Matter.Engine | null>(null);
@@ -73,7 +82,9 @@ export const useBilliardPhysics = (isPracticeMode: boolean = false) => {
       }
       if (renderRef.current && renderRef.current.canvas) {
         Matter.Render.stop(renderRef.current);
-        renderRef.current.canvas.remove();
+        if (renderRef.current.canvas.parentNode) {
+          renderRef.current.canvas.parentNode.removeChild(renderRef.current.canvas);
+        }
       }
       if (requestRef.current) {
         cancelAnimationFrame(requestRef.current);
@@ -184,6 +195,11 @@ export const useBilliardPhysics = (isPracticeMode: boolean = false) => {
             )
           );
           
+          // Callback when a ball is pocketed
+          if (props?.onBallPocketed && ballNumber > 0) {
+            props.onBallPocketed(ballNumber);
+          }
+          
           // Ball pocketing logic
           handlePocketedBall(ballNumber);
         }
@@ -233,7 +249,7 @@ export const useBilliardPhysics = (isPracticeMode: boolean = false) => {
     return () => {
       clearInterval(updateInterval);
     };
-  }, [gameState]);
+  }, [gameState, props]);
   
   // Handle a ball being pocketed
   const handlePocketedBall = useCallback((ballNumber: number) => {
@@ -349,7 +365,12 @@ export const useBilliardPhysics = (isPracticeMode: boolean = false) => {
         }
       }
     }
-  }, [balls, isPracticeMode, playerType]);
+    
+    // Save the pocketed ball to Supabase if authenticated
+    if (isAuthenticated && user && ballNumber > 0) {
+      saveShot(true, [ballNumber]);
+    }
+  }, [balls, isPracticeMode, playerType, isAuthenticated, user]);
   
   // Handle completion of a shot when all balls stop moving
   const handleShotCompleted = useCallback(() => {
@@ -524,6 +545,53 @@ export const useBilliardPhysics = (isPracticeMode: boolean = false) => {
     // Always end opponent's turn after their shot
     turnEndedRef.current = true;
   }, [balls, playerType]);
+
+  // Save shot data to Supabase
+  const saveShot = async (successful: boolean, ballsPocketed: number[] = []) => {
+    if (!isAuthenticated || !user) return;
+    
+    try {
+      // Get session id from localStorage or create one
+      let sessionId = localStorage.getItem('pool_practice_session_id');
+      
+      if (!sessionId) {
+        const { data, error } = await supabase
+          .from('practice_sessions')
+          .insert({
+            user_id: user.id,
+            shots_taken: 0,
+            balls_pocketed: 0
+          })
+          .select('id')
+          .single();
+          
+        if (error || !data) {
+          console.error("Failed to create practice session", error);
+          return;
+        }
+        
+        sessionId = data.id;
+        localStorage.setItem('pool_practice_session_id', sessionId);
+      }
+      
+      // Save shot data
+      await supabase
+        .from('practice_shots')
+        .insert({
+          session_id: sessionId,
+          user_id: user.id,
+          power,
+          angle: aimAngle,
+          balls_hit: firstBallHitRef.current ? [firstBallHitRef.current] : [],
+          balls_pocketed: ballsPocketed,
+          successful,
+          english_x: 0, // Could track english if implemented
+          english_y: 0
+        });
+    } catch (err) {
+      console.error("Error saving shot data:", err);
+    }
+  };
   
   // Initialize game on component mount and when container size changes
   useEffect(() => {
@@ -547,8 +615,11 @@ export const useBilliardPhysics = (isPracticeMode: boolean = false) => {
       if (runnerRef.current) {
         Matter.Runner.stop(runnerRef.current);
       }
-      if (renderRef.current) {
+      if (renderRef.current && renderRef.current.canvas) {
         Matter.Render.stop(renderRef.current);
+        if (renderRef.current.canvas.parentNode) {
+          renderRef.current.canvas.parentNode.removeChild(renderRef.current.canvas);
+        }
       }
       if (requestRef.current) {
         cancelAnimationFrame(requestRef.current);
@@ -611,6 +682,17 @@ export const useBilliardPhysics = (isPracticeMode: boolean = false) => {
     simulateCueStrike(cueBall, angle, power, english);
     
     setMessage(`Shot taken with ${power}% power!`);
+    
+    // Callback when a shot is taken
+    if (props?.onShotTaken) {
+      props.onShotTaken();
+    }
+    
+    // Save shot to Supabase if authenticated
+    if (isAuthenticated && user) {
+      saveShot(false);
+    }
+    
     setPower(0);
     
     // Reset references
@@ -619,7 +701,7 @@ export const useBilliardPhysics = (isPracticeMode: boolean = false) => {
     
     // Clear trajectory
     setTrajectoryPoints([]);
-  }, [gameState, power]);
+  }, [gameState, power, props, isAuthenticated, user]);
   
   // Update the trajectory line based on aim
   const updateTrajectory = useCallback((startX: number, startY: number, targetX: number, targetY: number) => {
