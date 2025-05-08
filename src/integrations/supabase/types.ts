@@ -9,13 +9,248 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      games: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          id: string
+          player1_id: string
+          player2_id: string | null
+          stake_amount: number
+          status: string
+          winner_id: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          player1_id: string
+          player2_id?: string | null
+          stake_amount: number
+          status?: string
+          winner_id?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          player1_id?: string
+          player2_id?: string | null
+          stake_amount?: number
+          status?: string
+          winner_id?: string | null
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar: string | null
+          created_at: string
+          experience: number
+          id: string
+          level: number
+          loss_count: number
+          username: string
+          win_count: number
+        }
+        Insert: {
+          avatar?: string | null
+          created_at?: string
+          experience?: number
+          id: string
+          level?: number
+          loss_count?: number
+          username: string
+          win_count?: number
+        }
+        Update: {
+          avatar?: string | null
+          created_at?: string
+          experience?: number
+          id?: string
+          level?: number
+          loss_count?: number
+          username?: string
+          win_count?: number
+        }
+        Relationships: []
+      }
+      tournament_matches: {
+        Row: {
+          created_at: string
+          game_id: string
+          id: string
+          match_order: number
+          round: number
+          tournament_id: string
+        }
+        Insert: {
+          created_at?: string
+          game_id: string
+          id?: string
+          match_order: number
+          round: number
+          tournament_id: string
+        }
+        Update: {
+          created_at?: string
+          game_id?: string
+          id?: string
+          match_order?: number
+          round?: number
+          tournament_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tournament_matches_game_id_fkey"
+            columns: ["game_id"]
+            isOneToOne: false
+            referencedRelation: "games"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tournament_matches_tournament_id_fkey"
+            columns: ["tournament_id"]
+            isOneToOne: false
+            referencedRelation: "tournaments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tournament_participants: {
+        Row: {
+          id: string
+          registration_time: string
+          tournament_id: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          registration_time?: string
+          tournament_id: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          registration_time?: string
+          tournament_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tournament_participants_tournament_id_fkey"
+            columns: ["tournament_id"]
+            isOneToOne: false
+            referencedRelation: "tournaments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tournaments: {
+        Row: {
+          created_at: string
+          description: string | null
+          entry_fee: number
+          id: string
+          max_players: number
+          name: string
+          prize_pool: number
+          start_time: string
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          entry_fee: number
+          id?: string
+          max_players: number
+          name: string
+          prize_pool: number
+          start_time: string
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          entry_fee?: number
+          id?: string
+          max_players?: number
+          name?: string
+          prize_pool?: number
+          start_time?: string
+          status?: string
+        }
+        Relationships: []
+      }
+      transactions: {
+        Row: {
+          amount: number
+          description: string | null
+          id: string
+          timestamp: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          description?: string | null
+          id?: string
+          timestamp?: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          description?: string | null
+          id?: string
+          timestamp?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      wallets: {
+        Row: {
+          balance: number
+          created_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          balance?: number
+          created_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          balance?: number
+          created_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      deposit_money: {
+        Args: {
+          user_uuid: string
+          deposit_amount: number
+          description?: string
+        }
+        Returns: undefined
+      }
+      withdraw_money: {
+        Args: {
+          user_uuid: string
+          withdraw_amount: number
+          description?: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never
