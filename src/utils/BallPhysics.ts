@@ -159,7 +159,7 @@ export const handleBallCollision = (
   // Detect illegal hits (hitting wrong ball first)
   if (ballA.number === 0) { // Cue ball
     // If player type is assigned, must hit that type first
-    if (playerType && playerType !== BallType.CUE && playerType !== ballB.type) {
+    if (playerType && playerType !== BallType.EIGHT && ballB.type !== BallType.EIGHT && playerType !== ballB.type) {
       return {
         foul: true,
         message: `Foul! You must hit your ${playerType === BallType.SOLID ? 'solid' : 'striped'} balls first.`

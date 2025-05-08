@@ -30,12 +30,13 @@ const TrajectoryGuide = ({ points, showGuide }: TrajectoryGuideProps) => {
     
     return (
       <div 
-        className="absolute w-2 h-2 bg-white rounded-full transform -translate-x-1/2 -translate-y-1/2"
+        className="absolute w-3 h-3 bg-white rounded-full transform -translate-x-1/2 -translate-y-1/2"
         style={{
           top: `${collisionPoint.y}%`,
           left: `${collisionPoint.x}%`,
-          opacity: 0.6,
-          zIndex: 15
+          opacity: 0.7,
+          zIndex: 15,
+          boxShadow: '0 0 4px 2px rgba(255,255,255,0.4)'
         }}
       />
     );
@@ -50,8 +51,8 @@ const TrajectoryGuide = ({ points, showGuide }: TrajectoryGuideProps) => {
           y1={`${normalizedPoints[0].y}%`}
           x2={`${normalizedPoints[1].x}%`}
           y2={`${normalizedPoints[1].y}%`}
-          stroke="rgba(255,255,255,0.6)"
-          strokeWidth="1"
+          stroke="rgba(255,255,255,0.8)"
+          strokeWidth="2"
           strokeDasharray="5,3"
         />
         
@@ -62,9 +63,9 @@ const TrajectoryGuide = ({ points, showGuide }: TrajectoryGuideProps) => {
             y1={`${normalizedPoints[1].y}%`}
             x2={`${normalizedPoints[2].x}%`}
             y2={`${normalizedPoints[2].y}%`}
-            stroke="rgba(255,255,255,0.4)"
-            strokeWidth="1"
-            strokeDasharray="3,3"
+            stroke="rgba(255,255,255,0.6)"
+            strokeWidth="1.5"
+            strokeDasharray="4,2"
           />
         )}
       </svg>

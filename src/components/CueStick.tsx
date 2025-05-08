@@ -12,6 +12,7 @@ interface CueStickProps {
 
 const CueStick = ({ aimAngle, power, position, isPoweringUp, english }: CueStickProps) => {
   const [cueColor, setCueColor] = useState("#B86125"); // Default wood color
+  const offset = 30 + (power * 0.5); // Distance from cue ball center
   
   // Render an effect to show English being applied
   const renderEnglishIndicator = () => {
@@ -44,34 +45,38 @@ const CueStick = ({ aimAngle, power, position, isPoweringUp, english }: CueStick
   
   if (!isPoweringUp || !position) return null;
   
+  // Calculate cue stick position with offset from ball
+  const stickX = position.x - Math.cos(aimAngle) * offset;
+  const stickY = position.y - Math.sin(aimAngle) * offset;
+  
   return (
     <>
       {/* Cue stick base */}
       <div 
-        className="absolute h-1.5 rounded-full transform origin-right"
+        className="absolute h-2.5 rounded-full transform origin-left"
         style={{
           backgroundImage: `linear-gradient(90deg, ${cueColor} 50%, #8B4513 98%)`,
-          top: `${position.y / TABLE_HEIGHT * 100}%`,
-          left: `${position.x / TABLE_WIDTH * 100}%`,
-          width: `${30 + power * 0.5}%`,
-          transform: `translateY(-50%) rotate(${aimAngle}rad)`,
+          top: `${stickY / TABLE_HEIGHT * 100}%`,
+          left: `${stickX / TABLE_WIDTH * 100}%`,
+          width: `${35 + power * 0.2}%`,
+          transform: `translate(0, -50%) rotate(${aimAngle}rad)`,
           zIndex: 20,
-          boxShadow: "0 1px 2px rgba(0,0,0,0.3)"
+          boxShadow: "0 2px 4px rgba(0,0,0,0.5)"
         }}
       >
         {/* Cue decoration rings */}
-        <div className="absolute right-1/4 w-1 h-full bg-white/30"></div>
-        <div className="absolute right-1/3 w-1 h-full bg-white/30"></div>
-        <div className="absolute right-1/2 w-1 h-full bg-white/30"></div>
+        <div className="absolute right-1/4 w-2 h-full bg-white/30 rounded-full"></div>
+        <div className="absolute right-1/3 w-2 h-full bg-white/30 rounded-full"></div>
+        <div className="absolute right-1/2 w-2 h-full bg-white/30 rounded-full"></div>
       </div>
       
       {/* Cue tip */}
       <div 
-        className="absolute h-2.5 w-3 bg-blue-300 rounded-sm transform origin-left"
+        className="absolute h-3 w-4 bg-blue-300 rounded-sm transform origin-left"
         style={{
-          top: `${position.y / TABLE_HEIGHT * 100}%`,
-          left: `${position.x / TABLE_WIDTH * 100}%`,
-          transform: `translateY(-50%) rotate(${aimAngle}rad)`,
+          top: `${stickY / TABLE_HEIGHT * 100}%`,
+          left: `${stickX / TABLE_WIDTH * 100}%`,
+          transform: `translate(0, -50%) rotate(${aimAngle}rad)`,
           zIndex: 21
         }}
       ></div>
