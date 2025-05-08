@@ -12,7 +12,7 @@ import {
   BALL_COLORS,
   BallType
 } from '@/utils/GamePhysics';
-import { applyEnglish, calculateTrajectoryPath, findFirstCollisionBall } from '@/utils/BallPhysics';
+import { applyEnglish, calculateTrajectoryPath, findFirstCollisionBall, simulateCueStrike } from '@/utils/BallPhysics';
 
 type BallState = {
   number: number;
@@ -607,8 +607,7 @@ export const useBilliardPhysics = (isPracticeMode: boolean = false) => {
     const dy = start.y - end.y;
     const angle = Math.atan2(dy, dx);
     
-    // Use our new simulateCueStrike function to apply physics
-    import { simulateCueStrike } from '@/utils/BallPhysics';
+    // Call the simulateCueStrike function properly
     simulateCueStrike(cueBall, angle, power, english);
     
     setMessage(`Shot taken with ${power}% power!`);
