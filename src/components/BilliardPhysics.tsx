@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef } from 'react';
 import Matter from 'matter-js';
 
@@ -140,6 +139,7 @@ const BilliardPhysics = () => {
       Matter.World.clear(engine.world);
       Matter.Engine.clear(engine);
       Matter.Render.stop(render);
+      // Fix the canvas removal issue - check if parent exists before removing
       if (render.canvas.parentNode) {
         render.canvas.parentNode.removeChild(render.canvas);
       }
@@ -174,4 +174,3 @@ const BilliardPhysics = () => {
 };
 
 export default BilliardPhysics;
-
