@@ -18,6 +18,7 @@ const CueStick = ({ aimAngle, power, position, isPoweringUp, english }: CueStick
   const renderEnglishIndicator = () => {
     if (!english.x && !english.y) return null;
     
+    // Show a guide for where the english will be applied
     return (
       <div 
         className="absolute w-4 h-4 rounded-full bg-white border border-gray-500 shadow-md"
@@ -28,7 +29,11 @@ const CueStick = ({ aimAngle, power, position, isPoweringUp, english }: CueStick
           opacity: 0.7,
           zIndex: 25
         }}
-      ></div>
+      >
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="w-1 h-1 bg-red-500 rounded-full"></div>
+        </div>
+      </div>
     );
   };
   
@@ -78,6 +83,20 @@ const CueStick = ({ aimAngle, power, position, isPoweringUp, english }: CueStick
           left: `${stickX / TABLE_WIDTH * 100}%`,
           transform: `translate(0, -50%) rotate(${aimAngle}rad)`,
           zIndex: 21
+        }}
+      ></div>
+      
+      {/* Power indicator */}
+      <div 
+        className="absolute h-1 transform origin-left"
+        style={{
+          background: `linear-gradient(90deg, rgba(255,255,255,0.7), transparent)`,
+          top: `${stickY / TABLE_HEIGHT * 100}%`,
+          left: `${stickX / TABLE_WIDTH * 100}%`,
+          width: `${power * 0.6}px`,
+          transform: `translate(0, -50%) rotate(${aimAngle}rad)`,
+          zIndex: 19,
+          opacity: 0.6
         }}
       ></div>
       

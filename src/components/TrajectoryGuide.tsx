@@ -42,32 +42,44 @@ const TrajectoryGuide = ({ points, showGuide }: TrajectoryGuideProps) => {
     );
   };
   
+  // Create a dashed gradient line for better visibility on different felt colors
+  const createDashedLine = (x1: string, y1: string, x2: string, y2: string, index: number) => {
+    return (
+      <line
+        key={`line-${index}`}
+        x1={x1}
+        y1={y1}
+        x2={x2}
+        y2={y2}
+        stroke={index === 0 ? "rgba(255,255,255,0.8)" : "rgba(255,255,255,0.6)"}
+        strokeWidth={index === 0 ? "2" : "1.5"}
+        strokeDasharray={index === 0 ? "5,3" : "4,2"}
+      />
+    );
+  };
+  
   return (
     <>
       <svg className="absolute inset-0 w-full h-full pointer-events-none z-10">
         {/* First line segment - from cue ball to first collision */}
-        <line
-          x1={`${normalizedPoints[0].x}%`}
-          y1={`${normalizedPoints[0].y}%`}
-          x2={`${normalizedPoints[1].x}%`}
-          y2={`${normalizedPoints[1].y}%`}
-          stroke="rgba(255,255,255,0.8)"
-          strokeWidth="2"
-          strokeDasharray="5,3"
-        />
+        {createDashedLine(
+          `${normalizedPoints[0].x}%`,
+          `${normalizedPoints[0].y}%`,
+          `${normalizedPoints[1].x}%`,
+          `${normalizedPoints[1].y}%`,
+          0
+        )}
         
         {/* If there are more points, draw the post-collision trajectory */}
-        {normalizedPoints.length > 2 && (
-          <line
-            x1={`${normalizedPoints[1].x}%`}
-            y1={`${normalizedPoints[1].y}%`}
-            x2={`${normalizedPoints[2].x}%`}
-            y2={`${normalizedPoints[2].y}%`}
-            stroke="rgba(255,255,255,0.6)"
-            strokeWidth="1.5"
-            strokeDasharray="4,2"
-          />
-        )}
+        {normalizedPoints.length > 2 && 
+          createDashedLine(
+            `${normalizedPoints[1].x}%`,
+            `${normalizedPoints[1].y}%`,
+            `${normalizedPoints[2].x}%`,
+            `${normalizedPoints[2].y}%`,
+            1
+          )
+        }
       </svg>
       
       {renderCollisionPoint()}

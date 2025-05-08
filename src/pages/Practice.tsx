@@ -3,8 +3,9 @@ import { useState, useEffect } from "react";
 import TopNavigation from "@/components/TopNavigation";
 import BilliardTable from "@/components/BilliardTable";
 import { Button } from "@/components/ui/button";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, HelpCircle } from "lucide-react";
 import TutorialModal from "@/components/TutorialModal";
+import { toast } from "sonner";
 
 const Practice = () => {
   const [resetKey, setResetKey] = useState(0);
@@ -20,6 +21,7 @@ const Practice = () => {
 
   const handleResetTable = () => {
     setResetKey(prev => prev + 1);
+    toast.info("Table reset! All balls have been repositioned.");
   };
 
   const handleCloseTutorial = (dontShowAgain: boolean) => {
@@ -47,10 +49,10 @@ const Practice = () => {
             <div className="flex gap-2">
               <Button 
                 variant="outline" 
-                className="border-white/20"
+                className="border-white/20 flex items-center gap-2"
                 onClick={handleShowTutorial}
               >
-                How to Play
+                <HelpCircle className="w-4 h-4" /> How to Play
               </Button>
               <Button 
                 variant="outline" 
@@ -71,6 +73,7 @@ const Practice = () => {
               <li>• Your ball type (solids or stripes) is determined by the first ball you pocket</li>
               <li>• Pocket all your balls and then the 8-ball to win</li>
               <li>• Pocketing the 8-ball early or scratching on the 8-ball results in a loss</li>
+              <li>• Apply english (spin) by using the control in the bottom left corner</li>
             </ul>
           </div>
         </div>
