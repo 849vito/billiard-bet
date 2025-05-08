@@ -9,24 +9,39 @@ export const applyEnglish = (
   power: number,
   english: { x: number, y: number } // English applied (-1 to 1 for both x and y)
 ) => {
-  // Calculate base force
+  // Calculate base force with improved physics model
+  const forceMagnitude = power * 0.05;
   const force = {
-    x: Math.cos(angle) * power,
-    y: Math.sin(angle) * power
+    x: Math.cos(angle) * forceMagnitude,
+    y: Math.sin(angle) * forceMagnitude
   };
   
   // Apply the force to the ball
   Matter.Body.applyForce(ball, ball.position, force);
   
-  // Calculate spin based on english
-  // This is simplified; real spin would affect trajectory over time
+  // Calculate spin based on english (side spin)
+  const spinFactor = 0.02;
   const spin = {
-    x: english.x * power * 0.02,
-    y: english.y * power * 0.02
+    x: english.x * power * spinFactor,
+    y: english.y * power * spinFactor
   };
   
   // Apply angular velocity for visual spin effect
   Matter.Body.setAngularVelocity(ball, (english.x + english.y) * 0.1);
+  
+  // Apply subtle position adjustment based on english (for draw/follow shots)
+  if (english.y !== 0) {
+    // Simulate draw (negative y) or follow (positive y) shots
+    const followAdjustment = english.y * 0.2;
+    const adjustedPosition = {
+      x: ball.position.x,
+      y: ball.position.y + followAdjustment
+    };
+    Matter.Body.translate(ball, {
+      x: 0,
+      y: followAdjustment * 0.1
+    });
+  }
   
   return { force, spin };
 };
@@ -39,7 +54,7 @@ export const calculateReflection = (
   // Calculate dot product
   const dot = incidentVector.x * surfaceNormal.x + incidentVector.y * surfaceNormal.y;
   
-  // Calculate reflection vector
+  // Calculate reflection vector using the reflection formula
   const reflection = {
     x: incidentVector.x - 2 * dot * surfaceNormal.x,
     y: incidentVector.y - 2 * dot * surfaceNormal.y
@@ -184,4 +199,51 @@ export const handleBallCollision = (
     foul: false,
     message: ""
   };
+};
+
+// New function to simulate the physics of a cue stick striking the cue ball
+export const simulateCueStrike = (
+  cueBall: Matter.Body,
+  angle: number,
+  power: number,
+  english: { x: number, y: number }
+): void => {
+  if (!cueBall) return;
+  
+  // Calculate the impulse force based on the power setting (0-100)
+  // We use a non-linear power curve for more realistic feel
+  const powerFactor = Math.pow(power / 100, 1.5) * 0.15;
+  
+  // Calculate force direction based on angle
+  const forceDirection = {
+    x: Math.cos(angle),
+    y: Math.sin(angle)
+  };
+  
+  // Apply main force to the cue ball
+  Matter.Body.applyForce(cueBall, cueBall.position, {
+    x: forceDirection.x * powerFactor,
+    y: forceDirection.y * powerFactor
+  });
+  
+  // Apply spin/english effects
+  if (english.x !== 0 || english.y !== 0) {
+    // Side spin (english.x) affects the ball's path slightly
+    const sideSpin = english.x * 0.001 * power;
+    Matter.Body.applyForce(cueBall, cueBall.position, {
+      x: -forceDirection.y * sideSpin,
+      y: forceDirection.x * sideSpin
+    });
+    
+    // Top/bottom spin (english.y) affects roll and eventual speed
+    const topSpin = english.y * 0.01;
+    Matter.Body.setAngularVelocity(cueBall, topSpin);
+  }
+  
+  // Add slight randomness for realism (ball imperfections, etc)
+  const randomness = 0.0005;
+  Matter.Body.applyForce(cueBall, cueBall.position, {
+    x: (Math.random() - 0.5) * randomness * power,
+    y: (Math.random() - 0.5) * randomness * power
+  });
 };

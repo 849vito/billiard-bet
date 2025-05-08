@@ -607,17 +607,9 @@ export const useBilliardPhysics = (isPracticeMode: boolean = false) => {
     const dy = start.y - end.y;
     const angle = Math.atan2(dy, dx);
     
-    // Calculate force vector based on aim and power
-    const baseForce = calculateShotVector(
-      start.x, 
-      start.y, 
-      end.x, 
-      end.y, 
-      power
-    );
-    
-    // Apply force and english to cue ball
-    applyEnglish(cueBall, angle, power * 0.05, english);
+    // Use our new simulateCueStrike function to apply physics
+    import { simulateCueStrike } from '@/utils/BallPhysics';
+    simulateCueStrike(cueBall, angle, power, english);
     
     setMessage(`Shot taken with ${power}% power!`);
     setPower(0);
