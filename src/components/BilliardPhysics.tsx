@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef } from 'react';
 import Matter from 'matter-js';
 
@@ -138,6 +139,7 @@ const BilliardPhysics = () => {
       clearInterval(gameInterval);
       Matter.World.clear(engine.world);
       Matter.Engine.clear(engine);
+      // Fix for Matter.Render.stop() - provide both render and timing arguments
       Matter.Render.stop(render);
       // Fix the canvas removal issue - check if parent exists before removing
       if (render.canvas.parentNode) {
