@@ -1,15 +1,16 @@
 
 import { useState, useEffect } from "react";
 import TopNavigation from "@/components/TopNavigation";
+import BilliardTable from "@/components/BilliardTable";
 import { Button } from "@/components/ui/button";
 import { RefreshCw, HelpCircle } from "lucide-react";
 import TutorialModal from "@/components/TutorialModal";
 import { toast } from "sonner";
-import PhaserBilliardGame from "@/components/PhaserBilliardGame";
 
 const Practice = () => {
   const [resetKey, setResetKey] = useState(0);
   const [showTutorial, setShowTutorial] = useState(false);
+  const [debugMode, setDebugMode] = useState(false);
 
   // Check local storage for tutorial preference
   useEffect(() => {
@@ -33,6 +34,11 @@ const Practice = () => {
 
   const handleShowTutorial = () => {
     setShowTutorial(true);
+  };
+
+  const toggleDebugMode = () => {
+    setDebugMode(!debugMode);
+    toast.info(debugMode ? "Debug mode disabled" : "Debug mode enabled");
   };
 
   return (
@@ -61,19 +67,26 @@ const Practice = () => {
               >
                 <RefreshCw className="w-4 h-4" /> Reset Table
               </Button>
+              <Button
+                variant="outline"
+                className={`border-white/20 ${debugMode ? 'bg-red-500/20' : ''}`}
+                onClick={toggleDebugMode}
+              >
+                {debugMode ? 'Disable Debug' : 'Enable Debug'}
+              </Button>
             </div>
           </div>
           
-          <PhaserBilliardGame key={resetKey} resetKey={resetKey} />
+          <BilliardTable key={resetKey} isPracticeMode={true} debugMode={debugMode} />
           
           <div className="mt-6 glass p-4 rounded-lg max-w-lg mx-auto">
-            <h2 className="text-lg font-medium mb-3">How to Play</h2>
+            <h2 className="text-lg font-medium mb-3">8-Ball Rules</h2>
             <ul className="space-y-2 text-sm text-gray-300">
-              <li>• Click and hold on the cue ball to aim</li>
-              <li>• Drag and release to set power and take a shot</li>
-              <li>• You're assigned solids or stripes based on first ball pocketed</li>
+              <li>• Break the rack and try to pocket a ball</li>
+              <li>• Your ball type (solids or stripes) is determined by the first ball you pocket</li>
               <li>• Pocket all your balls and then the 8-ball to win</li>
-              <li>• If you pocket the cue ball (scratch), it will be replaced</li>
+              <li>• Pocketing the 8-ball early or scratching on the 8-ball results in a loss</li>
+              <li>• Apply english (spin) by using the control in the bottom left corner</li>
             </ul>
           </div>
         </div>
