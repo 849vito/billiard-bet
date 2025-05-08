@@ -10,6 +10,7 @@ import { toast } from "sonner";
 const Practice = () => {
   const [resetKey, setResetKey] = useState(0);
   const [showTutorial, setShowTutorial] = useState(false);
+  const [debugMode, setDebugMode] = useState(false);
 
   // Check local storage for tutorial preference
   useEffect(() => {
@@ -33,6 +34,11 @@ const Practice = () => {
 
   const handleShowTutorial = () => {
     setShowTutorial(true);
+  };
+
+  const toggleDebugMode = () => {
+    setDebugMode(!debugMode);
+    toast.info(debugMode ? "Debug mode disabled" : "Debug mode enabled");
   };
 
   return (
@@ -61,10 +67,17 @@ const Practice = () => {
               >
                 <RefreshCw className="w-4 h-4" /> Reset Table
               </Button>
+              <Button
+                variant="outline"
+                className={`border-white/20 ${debugMode ? 'bg-red-500/20' : ''}`}
+                onClick={toggleDebugMode}
+              >
+                {debugMode ? 'Disable Debug' : 'Enable Debug'}
+              </Button>
             </div>
           </div>
           
-          <BilliardTable key={resetKey} isPracticeMode={true} />
+          <BilliardTable key={resetKey} isPracticeMode={true} debugMode={debugMode} />
           
           <div className="mt-6 glass p-4 rounded-lg max-w-lg mx-auto">
             <h2 className="text-lg font-medium mb-3">8-Ball Rules</h2>

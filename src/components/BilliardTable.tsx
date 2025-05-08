@@ -1,4 +1,3 @@
-
 import { useCallback, useEffect, useState, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { useGame } from "@/context/GameContext";
@@ -16,9 +15,10 @@ import EnglishControl from './EnglishControl';
 
 interface BilliardTableProps {
   isPracticeMode?: boolean;
+  debugMode?: boolean;
 }
 
-const BilliardTable = ({ isPracticeMode = false }: BilliardTableProps) => {
+const BilliardTable = ({ isPracticeMode = false, debugMode = false }: BilliardTableProps) => {
   const { currentMatch } = useGame();
   const isMobile = useIsMobile();
   
@@ -45,9 +45,12 @@ const BilliardTable = ({ isPracticeMode = false }: BilliardTableProps) => {
   const [english, setEnglish] = useState<{ x: number, y: number }>({ x: 0, y: 0 });
   const [showTrajectory, setShowTrajectory] = useState(true);
   const [fineControl, setFineControl] = useState(false);
+  const [lastShotInfo, setLastShotInfo] = useState<{angle: number, power: number} | null>(null);
   
   // Handle mouse/touch interactions
   const handleMouseDown = (e: React.MouseEvent) => {
+    if (gameState !== 'waiting') return;
+    
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
@@ -57,6 +60,7 @@ const BilliardTable = ({ isPracticeMode = false }: BilliardTableProps) => {
     // Attach event listeners to handle shot
     const handleMouseUp = () => {
       clearInterval(powerInterval);
+      setLastShotInfo({angle: aimAngle, power: power});
       takeShot(english);
       document.removeEventListener('mouseup', handleMouseUp);
       document.removeEventListener('mousemove', handleMouseMoveListener);
@@ -76,7 +80,7 @@ const BilliardTable = ({ isPracticeMode = false }: BilliardTableProps) => {
   };
 
   const handleTouchStart = (e: React.TouchEvent) => {
-    if (e.touches.length === 0) return;
+    if (e.touches.length === 0 || gameState !== 'waiting') return;
     
     const rect = e.currentTarget.getBoundingClientRect();
     const touch = e.touches[0];
@@ -88,6 +92,7 @@ const BilliardTable = ({ isPracticeMode = false }: BilliardTableProps) => {
     // Attach event listeners to handle shot
     const handleTouchEnd = () => {
       clearInterval(powerInterval);
+      setLastShotInfo({angle: aimAngle, power: power});
       takeShot(english);
       document.removeEventListener('touchend', handleTouchEnd);
       document.removeEventListener('touchmove', handleTouchMoveListener);
@@ -324,6 +329,22 @@ const BilliardTable = ({ isPracticeMode = false }: BilliardTableProps) => {
         <div className="absolute bottom-4 left-4">
           <EnglishControl onChange={handleEnglishChange} />
         </div>
+        
+        {/* Debug information if debug mode is enabled */}
+        {debugMode && (
+          <div className="absolute top-4 left-4 glass p-2 rounded-lg text-xs">
+            <div>Game State: {gameState}</div>
+            <div>Aim Angle: {aimAngle.toFixed(2)}</div>
+            <div>Power: {power}</div>
+            <div>English: x={english.x.toFixed(2)}, y={english.y.toFixed(2)}</div>
+            {lastShotInfo && (
+              <>
+                <div>Last Shot Angle: {lastShotInfo.angle.toFixed(2)}</div>
+                <div>Last Shot Power: {lastShotInfo.power}</div>
+              </>
+            )}
+          </div>
+        )}
         
         {/* Instructions overlay for focus mode */}
         {focusMode && (

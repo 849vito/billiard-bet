@@ -210,9 +210,13 @@ export const simulateCueStrike = (
 ): void => {
   if (!cueBall) return;
   
+  // Ensure we have some minimum power to prevent "no movement" bugs
+  const minPower = 5;
+  const adjustedPower = Math.max(power, minPower);
+  
   // Calculate the impulse force based on the power setting (0-100)
-  // We use a non-linear power curve for more realistic feel
-  const powerFactor = Math.pow(power / 100, 1.5) * 0.15;
+  // Increase forceFactor to make the ball move more noticeably
+  const forceFactor = Math.pow(adjustedPower / 100, 1.2) * 0.25; 
   
   // Calculate force direction based on angle
   const forceDirection = {
@@ -220,16 +224,19 @@ export const simulateCueStrike = (
     y: Math.sin(angle)
   };
   
-  // Apply main force to the cue ball
+  console.log(`Applying force: angle=${angle}, power=${adjustedPower}, force=${forceFactor}`);
+  console.log(`Direction: x=${forceDirection.x}, y=${forceDirection.y}`);
+  
+  // Apply main force to the cue ball with increased magnitude
   Matter.Body.applyForce(cueBall, cueBall.position, {
-    x: forceDirection.x * powerFactor,
-    y: forceDirection.y * powerFactor
+    x: forceDirection.x * forceFactor,
+    y: forceDirection.y * forceFactor
   });
   
   // Apply spin/english effects
   if (english.x !== 0 || english.y !== 0) {
     // Side spin (english.x) affects the ball's path slightly
-    const sideSpin = english.x * 0.001 * power;
+    const sideSpin = english.x * 0.001 * adjustedPower;
     Matter.Body.applyForce(cueBall, cueBall.position, {
       x: -forceDirection.y * sideSpin,
       y: forceDirection.x * sideSpin
@@ -243,7 +250,19 @@ export const simulateCueStrike = (
   // Add slight randomness for realism (ball imperfections, etc)
   const randomness = 0.0005;
   Matter.Body.applyForce(cueBall, cueBall.position, {
-    x: (Math.random() - 0.5) * randomness * power,
-    y: (Math.random() - 0.5) * randomness * power
+    x: (Math.random() - 0.5) * randomness * adjustedPower,
+    y: (Math.random() - 0.5) * randomness * adjustedPower
   });
+  
+  // Ensure the ball has velocity by directly setting it if needed
+  const velocity = {
+    x: forceDirection.x * forceFactor * 100,
+    y: forceDirection.y * forceFactor * 100
+  };
+  
+  // Make sure we have some minimum velocity
+  if (Math.abs(Matter.Body.getVelocity(cueBall).x) < 0.1 && 
+      Math.abs(Matter.Body.getVelocity(cueBall).y) < 0.1) {
+    Matter.Body.setVelocity(cueBall, velocity);
+  }
 };

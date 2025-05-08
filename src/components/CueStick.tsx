@@ -54,6 +54,9 @@ const CueStick = ({ aimAngle, power, position, isPoweringUp, english }: CueStick
   const stickX = position.x - Math.cos(aimAngle) * offset;
   const stickY = position.y - Math.sin(aimAngle) * offset;
   
+  // Calculate cue stick length based on power for visual feedback
+  const cueLength = 35 + power * 0.2; // Percentage of table width
+  
   return (
     <>
       {/* Cue stick base */}
@@ -63,7 +66,7 @@ const CueStick = ({ aimAngle, power, position, isPoweringUp, english }: CueStick
           backgroundImage: `linear-gradient(90deg, ${cueColor} 50%, #8B4513 98%)`,
           top: `${stickY / TABLE_HEIGHT * 100}%`,
           left: `${stickX / TABLE_WIDTH * 100}%`,
-          width: `${35 + power * 0.2}%`,
+          width: `${cueLength}%`,
           transform: `translate(0, -50%) rotate(${aimAngle}rad)`,
           zIndex: 20,
           boxShadow: "0 2px 4px rgba(0,0,0,0.5)"
