@@ -30,7 +30,7 @@ const GameTable = () => {
     <div className="min-h-screen flex flex-col">
       <TopNavigation />
       
-      <main className="flex-1 pt-20 pb-10 px-4">
+      <main className="flex-1 pt-20 pb-10 px-4 overflow-hidden">
         <div className="container mx-auto">
           <div className="mb-6 flex items-center justify-between">
             <div>

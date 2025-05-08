@@ -1,106 +1,109 @@
 
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { useGame } from "@/context/GameContext";
-
-type Ball = {
-  number: number;
-  position: { x: number, y: number };
-  pocketed: boolean;
-  color: string;
-};
+import { useBilliardPhysics } from '@/hooks/useBilliardPhysics';
+import { Slider } from "@/components/ui/slider";
+import { useIsMobile } from '@/hooks/use-mobile';
+import { TABLE_WIDTH, TABLE_HEIGHT, BALL_RADIUS } from '@/utils/GamePhysics';
 
 const BilliardTable = () => {
   const { currentMatch } = useGame();
-  const [power, setPower] = useState(0);
-  const [isPoweringUp, setIsPoweringUp] = useState(false);
-  const [balls, setBalls] = useState<Ball[]>([]);
-  const [message, setMessage] = useState("");
-
-  // Initialize balls
-  useEffect(() => {
-    const initialBalls: Ball[] = [
-      { number: 0, position: { x: 25, y: 50 }, pocketed: false, color: 'white' }, // Cue ball
-      { number: 1, position: { x: 75, y: 45 }, pocketed: false, color: 'yellow' },
-      { number: 2, position: { x: 75, y: 47 }, pocketed: false, color: 'blue' },
-      { number: 3, position: { x: 75, y: 50 }, pocketed: false, color: 'red' },
-      { number: 4, position: { x: 75, y: 53 }, pocketed: false, color: 'purple' },
-      { number: 5, position: { x: 75, y: 55 }, pocketed: false, color: 'orange' },
-      { number: 6, position: { x: 78, y: 46 }, pocketed: false, color: 'green' },
-      { number: 7, position: { x: 78, y: 48 }, pocketed: false, color: 'brown' },
-      { number: 8, position: { x: 78, y: 50 }, pocketed: false, color: 'black' },
-      { number: 9, position: { x: 78, y: 52 }, pocketed: false, color: 'yellow' },
-      { number: 10, position: { x: 78, y: 54 }, pocketed: false, color: 'blue' },
-      { number: 11, position: { x: 81, y: 47 }, pocketed: false, color: 'red' },
-      { number: 12, position: { x: 81, y: 49 }, pocketed: false, color: 'purple' },
-      { number: 13, position: { x: 81, y: 51 }, pocketed: false, color: 'orange' },
-      { number: 14, position: { x: 81, y: 53 }, pocketed: false, color: 'green' },
-      { number: 15, position: { x: 84, y: 48 }, pocketed: false, color: 'brown' }
-    ];
+  const isMobile = useIsMobile();
+  
+  const {
+    balls,
+    power,
+    isPoweringUp,
+    gameState,
+    message,
+    aimAngle,
+    trajectoryPoints,
+    containerRef,
+    startPoweringUp,
+    takeShot,
+    handleMouseMove
+  } = useBilliardPhysics();
+  
+  const [aimDirection, setAimDirection] = useState(0);
+  
+  // Handle mouse/touch interactions
+  const handleMouseDown = (e: React.MouseEvent) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
     
-    setBalls(initialBalls);
-    setMessage("Your turn! Click and hold to power up the shot.");
-  }, [currentMatch]);
-
-  const startPoweringUp = () => {
-    setIsPoweringUp(true);
-    const powerInterval = setInterval(() => {
-      setPower(prev => {
-        if (prev >= 100) {
-          clearInterval(powerInterval);
-          return 100;
-        }
-        return prev + 5;
-      });
-    }, 100);
-
-    // Store the interval ID for cleanup
-    return powerInterval;
-  };
-
-  const takeShot = () => {
-    setIsPoweringUp(false);
-    setMessage(`Shot taken with ${power}% power!`);
-    
-    // In a real implementation, this would trigger ball physics
-    // For now, we'll just reset the power
-    setTimeout(() => {
-      setPower(0);
-      setMessage("Your opponent's turn...");
-      
-      // After a delay, switch back to player's turn
-      setTimeout(() => {
-        setMessage("Your turn again! Click and hold to power up the shot.");
-      }, 3000);
-    }, 1000);
-  };
-
-  const handleMouseDown = () => {
-    const powerInterval = startPoweringUp();
+    const powerInterval = startPoweringUp(x, y);
     
     // Attach event listeners to handle shot
     const handleMouseUp = () => {
       clearInterval(powerInterval);
       takeShot();
       document.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('mousemove', handleMouseMoveListener);
+    };
+    
+    const handleMouseMoveListener = (e: MouseEvent) => {
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      handleMouseMove(x, y);
     };
     
     document.addEventListener('mouseup', handleMouseUp);
+    document.addEventListener('mousemove', handleMouseMoveListener);
   };
 
-  const handleTouchStart = () => {
-    const powerInterval = startPoweringUp();
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 0) return;
+    
+    const rect = e.currentTarget.getBoundingClientRect();
+    const touch = e.touches[0];
+    const x = touch.clientX - rect.left;
+    const y = touch.clientY - rect.top;
+    
+    const powerInterval = startPoweringUp(x, y);
     
     // Attach event listeners to handle shot
     const handleTouchEnd = () => {
       clearInterval(powerInterval);
       takeShot();
       document.removeEventListener('touchend', handleTouchEnd);
+      document.removeEventListener('touchmove', handleTouchMoveListener);
+    };
+    
+    const handleTouchMoveListener = (e: TouchEvent) => {
+      if (e.touches.length === 0) return;
+      
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      
+      const touch = e.touches[0];
+      const x = touch.clientX - rect.left;
+      const y = touch.clientY - rect.top;
+      handleMouseMove(x, y);
     };
     
     document.addEventListener('touchend', handleTouchEnd);
+    document.addEventListener('touchmove', handleTouchMoveListener);
+  };
+  
+  // Manual aim controls
+  const adjustAim = (direction: 'left' | 'right') => {
+    const adjustment = direction === 'left' ? -10 : 10;
+    setAimDirection(prev => prev + adjustment);
   };
 
+  // Normalize the position values for rendering
+  const normalizePosition = useCallback((x: number, y: number) => {
+    return {
+      x: (x / TABLE_WIDTH) * 100,
+      y: (y / TABLE_HEIGHT) * 100
+    };
+  }, []);
+  
   return (
     <div className="w-full max-w-4xl mx-auto">
       {/* Game header */}
@@ -133,6 +136,7 @@ const BilliardTable = () => {
       
       {/* Billiard Table */}
       <div 
+        ref={containerRef}
         className="table-cloth relative aspect-video rounded-b-lg border-8 border-pool-wood overflow-hidden"
         onMouseDown={handleMouseDown}
         onTouchStart={handleTouchStart}
@@ -145,6 +149,22 @@ const BilliardTable = () => {
         <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-6 h-6 rounded-full bg-black"></div>
         <div className="absolute bottom-0 right-0 w-6 h-6 rounded-full bg-black"></div>
         
+        {/* Trajectory guide */}
+        {trajectoryPoints.length > 0 && (
+          <svg className="absolute inset-0 w-full h-full pointer-events-none">
+            <polyline
+              points={trajectoryPoints.map(p => {
+                const normalized = normalizePosition(p.x, p.y);
+                return `${normalized.x}% ${normalized.y}%`;
+              }).join(' ')}
+              stroke="rgba(255,255,255,0.6)"
+              strokeWidth="1"
+              strokeDasharray="5,5"
+              fill="none"
+            />
+          </svg>
+        )}
+        
         {/* Balls */}
         {balls.map((ball) => (
           !ball.pocketed && (
@@ -152,8 +172,8 @@ const BilliardTable = () => {
               key={ball.number}
               className="absolute w-5 h-5 rounded-full transform -translate-x-1/2 -translate-y-1/2 border border-white/20 shadow-md"
               style={{
-                top: `${ball.position.y}%`,
-                left: `${ball.position.x}%`,
+                top: `${(ball.position.y / TABLE_HEIGHT) * 100}%`,
+                left: `${(ball.position.x / TABLE_WIDTH) * 100}%`,
                 backgroundColor: ball.color,
                 zIndex: ball.number === 0 ? 10 : 5
               }}
@@ -168,14 +188,14 @@ const BilliardTable = () => {
         ))}
         
         {/* Cue stick when powering up */}
-        {isPoweringUp && (
+        {isPoweringUp && balls.find(b => b.number === 0 && !b.pocketed) && (
           <div 
             className="absolute h-1 bg-amber-500 rounded-full transform origin-left"
             style={{
-              top: `${balls[0]?.position.y}%`,
-              left: `${balls[0]?.position.x}%`,
+              top: `${(balls.find(b => b.number === 0)?.position.y || 0) / TABLE_HEIGHT * 100}%`,
+              left: `${(balls.find(b => b.number === 0)?.position.x || 0) / TABLE_WIDTH * 100}%`,
               width: `${20 + power * 0.5}%`,
-              transform: 'translateY(-50%) rotate(-30deg) translateX(-95%)',
+              transform: `translateY(-50%) rotate(${aimAngle + aimDirection / 100}rad) translateX(-95%)`,
               zIndex: 20
             }}
           ></div>
@@ -200,13 +220,13 @@ const BilliardTable = () => {
       
       {/* Game controls */}
       <div className="grid grid-cols-3 gap-2 mt-4">
-        <Button variant="ghost" className="glass">
+        <Button variant="ghost" className="glass" onClick={() => adjustAim('left')}>
           Aim Left
         </Button>
         <Button variant="ghost" className="glass">
           Change View
         </Button>
-        <Button variant="ghost" className="glass">
+        <Button variant="ghost" className="glass" onClick={() => adjustAim('right')}>
           Aim Right
         </Button>
       </div>
