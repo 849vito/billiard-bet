@@ -79,14 +79,14 @@ const BilliardPhysics = () => {
 
     // Gestione della stecca (click-drag-release = colpo)
     let dragStart: { x: number, y: number } | null = null;
-    Events.on(mouseConstraint, 'startdrag', (e: Matter.IEventCollision<Matter.Engine>) => {
+    Events.on(mouseConstraint, 'startdrag', (e: Matter.IEvent<Matter.MouseConstraint>) => {
       const mouseEvent = e as unknown as { body: Matter.Body, mouse: { position: { x: number, y: number } } };
       if (mouseEvent.body && mouseEvent.body.label === 'cueBall') {
         dragStart = { x: mouseEvent.mouse.position.x, y: mouseEvent.mouse.position.y };
       }
     });
 
-    Events.on(mouseConstraint, 'enddrag', (e: Matter.IEventCollision<Matter.Engine>) => {
+    Events.on(mouseConstraint, 'enddrag', (e: Matter.IEvent<Matter.MouseConstraint>) => {
       const mouseEvent = e as unknown as { body: Matter.Body, mouse: { position: { x: number, y: number } } };
       if (dragStart && mouseEvent.body && mouseEvent.body.label === 'cueBall') {
         const dx = dragStart.x - mouseEvent.mouse.position.x;
@@ -174,3 +174,4 @@ const BilliardPhysics = () => {
 };
 
 export default BilliardPhysics;
+
