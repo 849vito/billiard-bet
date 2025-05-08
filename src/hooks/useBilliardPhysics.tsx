@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Matter from 'matter-js';
 import { toast } from "sonner";
@@ -370,7 +369,7 @@ export const useBilliardPhysics = (isPracticeMode: boolean = false, props?: UseB
     if (isAuthenticated && user && ballNumber > 0) {
       saveShot(true, [ballNumber]);
     }
-  }, [balls, isPracticeMode, playerType, isAuthenticated, user]);
+  }, [balls, isPracticeMode, playerType, isAuthenticated, user, props]);
   
   // Handle completion of a shot when all balls stop moving
   const handleShotCompleted = useCallback(() => {
@@ -471,7 +470,7 @@ export const useBilliardPhysics = (isPracticeMode: boolean = false, props?: UseB
         }
       }
     }
-  }, [balls, isPracticeMode, legalBreak, playerTurn, playerType]);
+  }, [balls, isPracticeMode, legalBreak, playerTurn, playerType, props]);
   
   // Simulate opponent's turn (for non-practice mode)
   const simulateOpponentShot = useCallback(() => {

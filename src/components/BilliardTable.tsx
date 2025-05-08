@@ -16,9 +16,16 @@ import EnglishControl from './EnglishControl';
 interface BilliardTableProps {
   isPracticeMode?: boolean;
   debugMode?: boolean;
+  onShotTaken?: () => void;
+  onBallPocketed?: (ballNumber: number) => void;
 }
 
-const BilliardTable = ({ isPracticeMode = false, debugMode = false }: BilliardTableProps) => {
+const BilliardTable = ({ 
+  isPracticeMode = false, 
+  debugMode = false,
+  onShotTaken,
+  onBallPocketed
+}: BilliardTableProps) => {
   const { currentMatch } = useGame();
   const isMobile = useIsMobile();
   
@@ -38,7 +45,7 @@ const BilliardTable = ({ isPracticeMode = false, debugMode = false }: BilliardTa
     playerType,
     isBreakShot,
     eightBallPocketable
-  } = useBilliardPhysics(isPracticeMode);
+  } = useBilliardPhysics(isPracticeMode, { onShotTaken, onBallPocketed });
   
   const [aimDirection, setAimDirection] = useState(0);
   const [focusMode, setFocusMode] = useState(false);

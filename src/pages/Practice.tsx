@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import TopNavigation from "@/components/TopNavigation";
 import BilliardTable from "@/components/BilliardTable";
+import PracticeTracker from "@/components/PracticeTracker";
 import { Button } from "@/components/ui/button";
 import { RefreshCw, HelpCircle, Save, Timer } from "lucide-react";
 import TutorialModal from "@/components/TutorialModal";
@@ -140,7 +141,7 @@ const Practice = () => {
     setShotsTaken(prev => prev + 1);
   };
 
-  const handleBallPocketed = () => {
+  const handleBallPocketed = (ballNumber: number) => {
     setBallsPocketed(prev => prev + 1);
   };
 
@@ -221,6 +222,8 @@ const Practice = () => {
             onShotTaken={handleShotTaken}
             onBallPocketed={handleBallPocketed} 
           />
+          
+          {isAuthenticated && <PracticeTracker />}
           
           <div className="mt-6 glass p-4 rounded-lg max-w-lg mx-auto">
             <h2 className="text-lg font-medium mb-3">8-Ball Rules</h2>
