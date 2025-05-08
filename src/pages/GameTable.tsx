@@ -1,21 +1,44 @@
 
 import { useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import TopNavigation from "@/components/TopNavigation";
 import BilliardTable from "@/components/BilliardTable";
 import { Button } from "@/components/ui/button";
 import { useGame } from "@/context/GameContext";
+import { toast } from "sonner";
 
 const GameTable = () => {
-  const { currentMatch, leaveMatch } = useGame();
+  const { id } = useParams();
+  const { currentMatch, leaveMatch, availableMatches, joinMatch } = useGame();
   const navigate = useNavigate();
-
-  // Redirect to dashboard if no active match
+  
+  // If no current match is set but we have an ID, try to join that match
   useEffect(() => {
-    if (!currentMatch) {
+    // If we already have the match loaded, don't do anything
+    if (currentMatch && currentMatch.id === id) {
+      return;
+    }
+    
+    // If we don't have a current match but have an ID, try to find and join that match
+    if (id && !currentMatch) {
+      const match = availableMatches.find(m => m.id === id);
+      if (match) {
+        // Join the match from the URL
+        joinMatch(id);
+      } else {
+        // Match not found in available matches
+        toast.error("Match not found");
+        navigate("/dashboard");
+      }
+    }
+  }, [id, currentMatch, availableMatches, joinMatch, navigate]);
+
+  // Redirect to dashboard if no active match and no ID
+  useEffect(() => {
+    if (!currentMatch && !id) {
       navigate("/dashboard");
     }
-  }, [currentMatch, navigate]);
+  }, [currentMatch, id, navigate]);
 
   const handleLeaveMatch = () => {
     leaveMatch();
@@ -23,7 +46,17 @@ const GameTable = () => {
   };
 
   if (!currentMatch) {
-    return null;
+    return (
+      <div className="min-h-screen flex flex-col">
+        <TopNavigation />
+        <main className="flex-1 pt-20 pb-10 px-4 flex items-center justify-center">
+          <div className="text-center">
+            <h2 className="text-xl font-medium">Loading match...</h2>
+            <p className="text-gray-400 mt-2">Please wait while we prepare your game</p>
+          </div>
+        </main>
+      </div>
+    );
   }
 
   return (
