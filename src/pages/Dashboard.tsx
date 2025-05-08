@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import TopNavigation from "@/components/TopNavigation";
@@ -172,6 +171,12 @@ const Dashboard = () => {
                               <div className="font-semibold">Tournament</div>
                               <div className="text-xs opacity-70">Compete in tournaments for bigger prizes</div>
                             </div>
+                          </Button>
+                        </Link>
+                        
+                        <Link to="/practice" className="w-full">
+                          <Button variant="outline" className="w-full">
+                            Practice Mode
                           </Button>
                         </Link>
                       </div>

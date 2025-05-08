@@ -17,6 +17,7 @@ import Wallet from "./pages/Wallet";
 import Profile from "./pages/Profile";
 import Leaderboard from "./pages/Leaderboard";
 import Tournaments from "./pages/Tournaments";
+import Practice from "./pages/Practice";
 import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/ProtectedRoute";
 
@@ -40,6 +41,7 @@ const App = () => (
                 <Route element={<ProtectedRoute />}>
                   <Route path="/dashboard" element={<Dashboard />} />
                   <Route path="/game/:id" element={<GameTable />} />
+                  <Route path="/practice" element={<Practice />} />
                   <Route path="/wallet" element={<Wallet />} />
                   <Route path="/profile" element={<Profile />} />
                   <Route path="/leaderboard" element={<Leaderboard />} />

@@ -1,4 +1,3 @@
-
 import { useCallback, useEffect, useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { useGame } from "@/context/GameContext";
@@ -7,7 +6,11 @@ import { Slider } from "@/components/ui/slider";
 import { useIsMobile } from '@/hooks/use-mobile';
 import { TABLE_WIDTH, TABLE_HEIGHT, BALL_RADIUS } from '@/utils/GamePhysics';
 
-const BilliardTable = () => {
+interface BilliardTableProps {
+  isPracticeMode?: boolean;
+}
+
+const BilliardTable = ({ isPracticeMode = false }: BilliardTableProps) => {
   const { currentMatch } = useGame();
   const isMobile = useIsMobile();
   
@@ -107,32 +110,41 @@ const BilliardTable = () => {
   return (
     <div className="w-full max-w-4xl mx-auto">
       {/* Game header */}
-      <div className="flex items-center justify-between glass p-3 rounded-t-lg">
-        <div className="flex items-center">
-          <div className="w-10 h-10 rounded-full bg-pool-blue flex items-center justify-center text-white font-bold border-2 border-pool-gold">
-            Y
+      {!isPracticeMode ? (
+        <div className="flex items-center justify-between glass p-3 rounded-t-lg">
+          <div className="flex items-center">
+            <div className="w-10 h-10 rounded-full bg-pool-blue flex items-center justify-center text-white font-bold border-2 border-pool-gold">
+              Y
+            </div>
+            <div className="ml-2">
+              <div className="text-sm font-medium">{currentMatch?.player1Username || "You"}</div>
+              <div className="text-xs text-gray-400">Solids</div>
+            </div>
           </div>
-          <div className="ml-2">
-            <div className="text-sm font-medium">{currentMatch?.player1Username || "You"}</div>
-            <div className="text-xs text-gray-400">Solids</div>
+          
+          <div className="text-center">
+            <div className="text-sm font-medium">Match #{currentMatch?.id?.slice(-4) || "0000"}</div>
+            <div className="text-xs text-pool-gold">${currentMatch?.betAmount?.toFixed(2) || "0.00"}</div>
+          </div>
+          
+          <div className="flex items-center">
+            <div className="mr-2 text-right">
+              <div className="text-sm font-medium">{currentMatch?.player2Username || "Opponent"}</div>
+              <div className="text-xs text-gray-400">Stripes</div>
+            </div>
+            <div className="w-10 h-10 rounded-full bg-pool-blue flex items-center justify-center text-white font-bold border-2 border-white/50">
+              O
+            </div>
           </div>
         </div>
-        
-        <div className="text-center">
-          <div className="text-sm font-medium">Match #{currentMatch?.id?.slice(-4) || "0000"}</div>
-          <div className="text-xs text-pool-gold">${currentMatch?.betAmount?.toFixed(2) || "0.00"}</div>
-        </div>
-        
-        <div className="flex items-center">
-          <div className="mr-2 text-right">
-            <div className="text-sm font-medium">{currentMatch?.player2Username || "Opponent"}</div>
-            <div className="text-xs text-gray-400">Stripes</div>
-          </div>
-          <div className="w-10 h-10 rounded-full bg-pool-blue flex items-center justify-center text-white font-bold border-2 border-white/50">
-            O
+      ) : (
+        <div className="flex items-center justify-center glass p-3 rounded-t-lg">
+          <div className="text-center">
+            <div className="text-sm font-medium">Practice Mode</div>
+            <div className="text-xs text-pool-gold">No Stakes</div>
           </div>
         </div>
-      </div>
+      )}
       
       {/* Billiard Table */}
       <div 
