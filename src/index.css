@@ -2,80 +2,90 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
- 
+
 @layer base {
   :root {
-    --background: 0 0% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 0 0% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 0 0% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 0 0% 9%;
-    --secondary: 0 0% 14.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 14.9%;
-    --muted-foreground: 0 0% 63.9%;
-    --accent: 0 0% 14.9%;
-    --accent-foreground: 0 0% 98%;
+    --background: 228 30% 10%;
+    --foreground: 210 40% 98%;
+
+    --card: 228 30% 15%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 228 30% 15%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 210 100% 52%;
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 120 60% 50%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 228 30% 20%;
+    --muted-foreground: 215 20.2% 65.1%;
+
+    --accent: 45 100% 50%;
+    --accent-foreground: 210 40% 98%;
+
     --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --ring: 0 0% 83.1%;
-    --radius: 0.5rem;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 228 30% 20%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 224.3 76.3% 48%;
+
+    --radius: 0.75rem;
+
+    --sidebar-background: 228 30% 15%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 5% 96%;
+    --sidebar-border: 228 30% 20%;
+    --sidebar-ring: 228 30% 70%;
   }
-}
- 
-@layer base {
+
   * {
     @apply border-border;
   }
+
   body {
-    @apply bg-background text-foreground;
-    font-feature-settings: "rlig" 1, "calt" 1;
+    @apply bg-background text-foreground antialiased;
+    background-image: radial-gradient(circle at center, rgba(30, 58, 95, 0.3) 0%, rgba(21, 27, 40, 0.6) 100%);
+    background-attachment: fixed;
+  }
+
+  .table-cloth {
+    background-color: theme('colors.pool.felt');
+    background-image: 
+      radial-gradient(circle at center, rgba(255, 255, 255, 0.05) 0%, rgba(0, 0, 0, 0.2) 100%),
+      linear-gradient(rgba(0, 0, 0, 0.1) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0, 0, 0, 0.1) 1px, transparent 1px);
+    background-size: 100% 100%, 20px 20px, 20px 20px;
+  }
+
+  .wood-texture {
+    background-color: theme('colors.pool.wood');
+    background-image: 
+      linear-gradient(90deg, rgba(0, 0, 0, 0.1) 1px, transparent 1px),
+      linear-gradient(rgba(0, 0, 0, 0.1) 1px, transparent 1px);
+    background-size: 5px 5px, 5px 5px;
+  }
+
+  .power-meter {
+    @apply h-6 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500 rounded-full overflow-hidden relative;
+  }
+
+  .power-meter::before {
+    content: '';
+    @apply absolute inset-0 bg-black bg-opacity-70 origin-left;
+    transform: scaleX(0);
+    animation: cue-power 1.5s ease-in-out infinite alternate;
   }
 }
 
-.glass {
-  background: rgba(255, 255, 255, 0.07);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-/* Table cloth colors */
-.bg-table-felt {
-  background-color: #0a6034;
-}
-
-.table-cloth {
-  position: relative;
-}
-
-/* Add special styling for billiard physics canvas */
-.billiard-table-container canvas {
-  border-radius: 8px;
-}
-
-/* Ensure the canvas is positioned correctly */
-.billiard-table-container {
-  position: relative;
-}
-
-.billiard-table-container .matter-canvas {
-  position: absolute;
-  top: 0;
-  left: 0;
-  z-index: 10;
-}
-
-/* Pocket styling */
-.pocket {
-  position: absolute;
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  background-color: #000;
-  z-index: 5;
+@layer utilities {
+  .glass {
+    @apply bg-black bg-opacity-30 backdrop-blur-md border border-white border-opacity-10;
+  }
 }

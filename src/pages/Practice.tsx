@@ -1,11 +1,11 @@
 
 import { useState, useEffect } from "react";
 import TopNavigation from "@/components/TopNavigation";
+import BilliardTable from "@/components/BilliardTable";
 import { Button } from "@/components/ui/button";
 import { RefreshCw, HelpCircle } from "lucide-react";
 import TutorialModal from "@/components/TutorialModal";
 import { toast } from "sonner";
-import BilliardPhysics from "@/components/BilliardPhysics";
 
 const Practice = () => {
   const [resetKey, setResetKey] = useState(0);
@@ -77,9 +77,7 @@ const Practice = () => {
             </div>
           </div>
           
-          <div key={resetKey}>
-            <BilliardPhysics />
-          </div>
+          <BilliardTable key={resetKey} isPracticeMode={true} debugMode={debugMode} />
           
           <div className="mt-6 glass p-4 rounded-lg max-w-lg mx-auto">
             <h2 className="text-lg font-medium mb-3">8-Ball Rules</h2>
@@ -88,7 +86,7 @@ const Practice = () => {
               <li>• Your ball type (solids or stripes) is determined by the first ball you pocket</li>
               <li>• Pocket all your balls and then the 8-ball to win</li>
               <li>• Pocketing the 8-ball early or scratching on the 8-ball results in a loss</li>
-              <li>• Click and drag the cue ball, then release to shoot</li>
+              <li>• Apply english (spin) by using the control in the bottom left corner</li>
             </ul>
           </div>
         </div>
