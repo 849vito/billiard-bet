@@ -41,7 +41,7 @@ class BilliardGame extends Phaser.Scene {
     // Punteggio e turni
     this.currentPlayer = PLAYER1;
     this.ballPocketedThisTurn = false;
-    this.scoreText = this.add.text(20, 20, '', { fontSize: '20px', fill: '#fff' });
+    this.scoreText = this.add.text(20, 20, '', { fontSize: '20px', color: '#fff' });
     this.updateScoreText();
 
     // Palla bianca
@@ -136,9 +136,9 @@ class BilliardGame extends Phaser.Scene {
     const balls = this.balls.getChildren();
     for (let b of balls) {
       const ball = b as Phaser.Physics.Arcade.Image;
-      if (ball.body.speed > 1) return true;
+      if (ball.body && (ball.body as Phaser.Physics.Arcade.Body).velocity.length() > 1) return true;
     }
-    return this.cueBall.body.speed > 1;
+    return this.cueBall.body && (this.cueBall.body as Phaser.Physics.Arcade.Body).velocity.length() > 1;
   }
 
   update() {
@@ -240,7 +240,7 @@ const PhaserBilliardGame = ({ resetKey = 0 }: PhaserBilliardGameProps) => {
       physics: {
         default: 'arcade',
         arcade: {
-          gravity: { y: 0 },
+          gravity: { x: 0, y: 0 },
           debug: false
         }
       },
