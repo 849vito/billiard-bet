@@ -1,13 +1,18 @@
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { useGame } from "@/context/GameContext";
 import { useBilliardPhysics } from '@/hooks/useBilliardPhysics';
-import { Slider } from "@/components/ui/slider";
 import { useIsMobile } from '@/hooks/use-mobile';
-import { TABLE_WIDTH, TABLE_HEIGHT, BALL_RADIUS } from '@/utils/GamePhysics';
+import { TABLE_WIDTH, TABLE_HEIGHT, BALL_RADIUS, BallType } from '@/utils/GamePhysics';
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Slider } from "@/components/ui/slider";
+import { toast } from "sonner";
+import CueStick from './CueStick';
+import TrajectoryGuide from './TrajectoryGuide';
+import GameStatus from './GameStatus';
+import EnglishControl from './EnglishControl';
 
 interface BilliardTableProps {
   isPracticeMode?: boolean;
@@ -30,11 +35,16 @@ const BilliardTable = ({ isPracticeMode = false }: BilliardTableProps) => {
     takeShot,
     handleMouseMove,
     playerTurn,
-    playerType
+    playerType,
+    isBreakShot,
+    eightBallPocketable
   } = useBilliardPhysics(isPracticeMode);
   
   const [aimDirection, setAimDirection] = useState(0);
   const [focusMode, setFocusMode] = useState(false);
+  const [english, setEnglish] = useState<{ x: number, y: number }>({ x: 0, y: 0 });
+  const [showTrajectory, setShowTrajectory] = useState(true);
+  const [fineControl, setFineControl] = useState(false);
   
   // Handle mouse/touch interactions
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -42,12 +52,12 @@ const BilliardTable = ({ isPracticeMode = false }: BilliardTableProps) => {
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     
-    const powerInterval = startPoweringUp(x, y);
+    const powerInterval = startPoweringUp(x, y, english);
     
     // Attach event listeners to handle shot
     const handleMouseUp = () => {
       clearInterval(powerInterval);
-      takeShot();
+      takeShot(english);
       document.removeEventListener('mouseup', handleMouseUp);
       document.removeEventListener('mousemove', handleMouseMoveListener);
     };
@@ -58,7 +68,7 @@ const BilliardTable = ({ isPracticeMode = false }: BilliardTableProps) => {
       
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
-      handleMouseMove(x, y);
+      handleMouseMove(x, y, fineControl);
     };
     
     document.addEventListener('mouseup', handleMouseUp);
@@ -73,12 +83,12 @@ const BilliardTable = ({ isPracticeMode = false }: BilliardTableProps) => {
     const x = touch.clientX - rect.left;
     const y = touch.clientY - rect.top;
     
-    const powerInterval = startPoweringUp(x, y);
+    const powerInterval = startPoweringUp(x, y, english);
     
     // Attach event listeners to handle shot
     const handleTouchEnd = () => {
       clearInterval(powerInterval);
-      takeShot();
+      takeShot(english);
       document.removeEventListener('touchend', handleTouchEnd);
       document.removeEventListener('touchmove', handleTouchMoveListener);
     };
@@ -92,7 +102,7 @@ const BilliardTable = ({ isPracticeMode = false }: BilliardTableProps) => {
       const touch = e.touches[0];
       const x = touch.clientX - rect.left;
       const y = touch.clientY - rect.top;
-      handleMouseMove(x, y);
+      handleMouseMove(x, y, fineControl);
     };
     
     document.addEventListener('touchend', handleTouchEnd);
@@ -103,6 +113,12 @@ const BilliardTable = ({ isPracticeMode = false }: BilliardTableProps) => {
   const adjustAim = (direction: 'left' | 'right') => {
     const adjustment = direction === 'left' ? -10 : 10;
     setAimDirection(prev => prev + adjustment);
+  };
+  
+  // Fine aim control
+  const toggleFineControl = () => {
+    setFineControl(!fineControl);
+    toast.info(fineControl ? "Standard aiming enabled" : "Fine aiming control enabled");
   };
 
   // Normalize the position values for rendering
@@ -118,6 +134,20 @@ const BilliardTable = ({ isPracticeMode = false }: BilliardTableProps) => {
     setFocusMode(!focusMode);
   };
   
+  // Toggle trajectory guide
+  const toggleTrajectory = () => {
+    setShowTrajectory(!showTrajectory);
+  };
+  
+  // Handle English control change
+  const handleEnglishChange = (newEnglish: { x: number, y: number }) => {
+    setEnglish(newEnglish);
+  };
+  
+  // Get cue ball for rendering
+  const cueBall = balls.find(ball => ball.number === 0 && !ball.pocketed);
+  const cueBallPosition = cueBall?.position;
+  
   return (
     <div className="w-full max-w-4xl mx-auto">
       {/* Game header */}
@@ -129,7 +159,7 @@ const BilliardTable = ({ isPracticeMode = false }: BilliardTableProps) => {
             </div>
             <div className="ml-2">
               <div className="text-sm font-medium">{currentMatch?.player1Username || "You"}</div>
-              <div className="text-xs text-gray-400">{playerType === 'solids' ? "Solids" : "Stripes"}</div>
+              <div className="text-xs text-gray-400">{playerType === BallType.SOLID ? "Solids" : playerType === BallType.STRIPE ? "Stripes" : "Not assigned"}</div>
             </div>
           </div>
           
@@ -141,7 +171,7 @@ const BilliardTable = ({ isPracticeMode = false }: BilliardTableProps) => {
           <div className="flex items-center">
             <div className="mr-2 text-right">
               <div className="text-sm font-medium">{currentMatch?.player2Username || "Opponent"}</div>
-              <div className="text-xs text-gray-400">{playerType === 'solids' ? "Stripes" : "Solids"}</div>
+              <div className="text-xs text-gray-400">{playerType === BallType.SOLID ? "Stripes" : playerType === BallType.STRIPE ? "Solids" : "Not assigned"}</div>
             </div>
             <div className="w-10 h-10 rounded-full bg-pool-blue flex items-center justify-center text-white font-bold border-2 border-white/50">
               O
@@ -154,15 +184,27 @@ const BilliardTable = ({ isPracticeMode = false }: BilliardTableProps) => {
             <div className="text-sm font-medium">Practice Mode</div>
             <div className="text-xs text-pool-gold">No Stakes</div>
           </div>
-          <div className="flex items-center gap-2">
-            <Label htmlFor="focus-mode" className="text-sm text-gray-300">
-              Focus Mode
-            </Label>
-            <Switch 
-              id="focus-mode" 
-              checked={focusMode}
-              onCheckedChange={toggleFocusMode}
-            />
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <Label htmlFor="trajectory-guide" className="text-sm text-gray-300">
+                Trajectory
+              </Label>
+              <Switch 
+                id="trajectory-guide" 
+                checked={showTrajectory}
+                onCheckedChange={toggleTrajectory}
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Label htmlFor="focus-mode" className="text-sm text-gray-300">
+                Focus Mode
+              </Label>
+              <Switch 
+                id="focus-mode" 
+                checked={focusMode}
+                onCheckedChange={toggleFocusMode}
+              />
+            </div>
           </div>
         </div>
       )}
@@ -170,10 +212,10 @@ const BilliardTable = ({ isPracticeMode = false }: BilliardTableProps) => {
       {/* Billiard Table */}
       <div 
         ref={containerRef}
-        className="table-cloth relative aspect-video rounded-b-lg border-8 border-pool-wood overflow-hidden"
+        className={`table-cloth relative aspect-video rounded-b-lg border-8 border-pool-wood overflow-hidden ${focusMode ? 'bg-table-felt' : ''}`}
         onMouseDown={handleMouseDown}
         onTouchStart={handleTouchStart}
-        style={focusMode ? { 
+        style={!focusMode ? { 
           backgroundImage: 'radial-gradient(circle at center, #0691d9 0%, #054663 100%)',
         } : {}}
       >
@@ -182,6 +224,15 @@ const BilliardTable = ({ isPracticeMode = false }: BilliardTableProps) => {
           <div className="absolute left-1/4 top-0 bottom-0 w-[1px] bg-white/10"></div>
           <div className="absolute left-1/2 top-0 bottom-0 w-[1px] bg-white/10"></div>
           <div className="absolute right-1/4 top-0 bottom-0 w-[1px] bg-white/10"></div>
+          
+          {/* Head spot */}
+          <div className="absolute left-1/4 top-1/2 w-1.5 h-1.5 bg-white/20 rounded-full transform -translate-x-1/2 -translate-y-1/2"></div>
+          
+          {/* Foot spot */}
+          <div className="absolute right-1/4 top-1/2 w-1.5 h-1.5 bg-white/20 rounded-full transform -translate-x-1/2 -translate-y-1/2"></div>
+          
+          {/* Center spot */}
+          <div className="absolute left-1/2 top-1/2 w-1.5 h-1.5 bg-white/20 rounded-full transform -translate-x-1/2 -translate-y-1/2"></div>
         </div>
         
         {/* Pockets */}
@@ -193,27 +244,17 @@ const BilliardTable = ({ isPracticeMode = false }: BilliardTableProps) => {
         <div className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-black shadow-inner transform translate-x-1/2 translate-y-1/2"></div>
         
         {/* Trajectory guide */}
-        {trajectoryPoints.length > 0 && (
-          <svg className="absolute inset-0 w-full h-full pointer-events-none">
-            <polyline
-              points={trajectoryPoints.map(p => {
-                const normalized = normalizePosition(p.x, p.y);
-                return `${normalized.x}% ${normalized.y}%`;
-              }).join(' ')}
-              stroke="rgba(255,255,255,0.6)"
-              strokeWidth="1"
-              strokeDasharray="5,5"
-              fill="none"
-            />
-          </svg>
-        )}
+        <TrajectoryGuide 
+          points={trajectoryPoints} 
+          showGuide={showTrajectory && isPoweringUp}
+        />
         
         {/* Balls */}
         {balls.map((ball) => (
           !ball.pocketed && (
             <div 
               key={ball.number}
-              className="absolute transform -translate-x-1/2 -translate-y-1/2 border border-white/20 shadow-md"
+              className="absolute transform -translate-x-1/2 -translate-y-1/2 ball-shadow"
               style={{
                 top: `${(ball.position.y / TABLE_HEIGHT) * 100}%`,
                 left: `${(ball.position.x / TABLE_WIDTH) * 100}%`,
@@ -222,12 +263,24 @@ const BilliardTable = ({ isPracticeMode = false }: BilliardTableProps) => {
                 borderRadius: '50%',
                 backgroundColor: ball.color,
                 zIndex: ball.number === 0 ? 10 : 5,
-                backgroundImage: ball.number > 8 ? 'linear-gradient(to bottom, white 0%, white 50%, transparent 50%, transparent 100%)' : 'none'
+                boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
+                border: '1px solid rgba(255,255,255,0.2)'
               }}
             >
               {ball.number > 0 && (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span className={`text-xs font-bold ${ball.number > 8 ? 'text-black' : 'text-white'}`}>
+                <div 
+                  className={`absolute inset-0 flex items-center justify-center rounded-full 
+                    ${ball.number > 8 ? 'striped-ball' : ''} 
+                    ${ball.number === 8 ? 'black-ball' : ''}`}
+                  style={{
+                    overflow: 'hidden'
+                  }}
+                >
+                  {ball.number > 8 && (
+                    <div className="absolute inset-x-0 top-0 h-[50%] bg-white"></div>
+                  )}
+                  
+                  <span className={`text-xs font-bold z-10 ${ball.number > 8 ? 'text-black' : 'text-white'}`}>
                     {ball.number}
                   </span>
                 </div>
@@ -237,43 +290,24 @@ const BilliardTable = ({ isPracticeMode = false }: BilliardTableProps) => {
         ))}
         
         {/* Cue stick when powering up */}
-        {isPoweringUp && balls.find(b => b.number === 0 && !b.pocketed) && (
-          <>
-            {/* Cue stick base */}
-            <div 
-              className="absolute h-1 bg-gradient-to-r from-amber-900 to-amber-600 rounded-full transform origin-left"
-              style={{
-                top: `${(balls.find(b => b.number === 0)?.position.y || 0) / TABLE_HEIGHT * 100}%`,
-                left: `${(balls.find(b => b.number === 0)?.position.x || 0) / TABLE_WIDTH * 100}%`,
-                width: `${30 + power * 0.5}%`,
-                transform: `translateY(-50%) rotate(${aimAngle + aimDirection / 100}rad) translateX(-98%)`,
-                zIndex: 20
-              }}
-            ></div>
-            
-            {/* Cue tip */}
-            <div 
-              className="absolute h-2 w-3 bg-blue-200 rounded-sm transform origin-right"
-              style={{
-                top: `${(balls.find(b => b.number === 0)?.position.y || 0) / TABLE_HEIGHT * 100}%`,
-                left: `${(balls.find(b => b.number === 0)?.position.x || 0) / TABLE_WIDTH * 100}%`,
-                transform: `translateY(-50%) rotate(${aimAngle + aimDirection / 100}rad) translateX(${-(30 + power * 0.5)}%)`,
-                zIndex: 21
-              }}
-            ></div>
-          </>
+        {isPoweringUp && cueBallPosition && (
+          <CueStick 
+            aimAngle={aimAngle + (aimDirection / 100)} 
+            power={power}
+            position={cueBallPosition}
+            isPoweringUp={isPoweringUp}
+            english={english}
+          />
         )}
         
-        {/* Turn indicator */}
-        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 glass px-4 py-2 rounded-full text-sm flex items-center gap-2">
-          <div className={`w-3 h-3 rounded-full ${playerTurn === 'player' ? 'bg-green-500' : 'bg-red-500'}`}></div>
-          <span>{playerTurn === 'player' ? 'Your Turn' : 'Opponent Turn'}</span>
-        </div>
-        
-        {/* Message overlay */}
-        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 glass px-4 py-2 rounded-full text-sm">
-          {message}
-        </div>
+        {/* Game status components */}
+        <GameStatus 
+          playerType={playerType}
+          playerTurn={playerTurn}
+          message={message}
+          eightBallPocketable={eightBallPocketable}
+          isBreakShot={isBreakShot}
+        />
         
         {/* Power meter */}
         <div className="absolute bottom-4 right-4 glass p-2 rounded-lg">
@@ -284,6 +318,11 @@ const BilliardTable = ({ isPracticeMode = false }: BilliardTableProps) => {
               style={{ width: `${power}%` }}
             ></div>
           </div>
+        </div>
+        
+        {/* English control */}
+        <div className="absolute bottom-4 left-4">
+          <EnglishControl onChange={handleEnglishChange} />
         </div>
         
         {/* Instructions overlay for focus mode */}
@@ -302,7 +341,7 @@ const BilliardTable = ({ isPracticeMode = false }: BilliardTableProps) => {
             {Array.from({ length: 7 }).map((_, i) => (
               <div 
                 key={`solid-${i+1}`} 
-                className="w-4 h-4 rounded-full" 
+                className={`w-4 h-4 rounded-full ${playerType === BallType.SOLID ? 'ring-1 ring-offset-1 ring-white/30' : ''}`}
                 style={{ 
                   backgroundColor: balls.find(b => b.number === i+1)?.pocketed ? 'transparent' : balls.find(b => b.number === i+1)?.color,
                   opacity: balls.find(b => b.number === i+1)?.pocketed ? 0.3 : 1,
@@ -319,7 +358,7 @@ const BilliardTable = ({ isPracticeMode = false }: BilliardTableProps) => {
             {Array.from({ length: 8 }).map((_, i) => (
               <div 
                 key={`stripe-${i+8}`} 
-                className="w-4 h-4 rounded-full overflow-hidden" 
+                className={`w-4 h-4 rounded-full overflow-hidden ${playerType === BallType.STRIPE ? 'ring-1 ring-offset-1 ring-white/30' : ''}`}
                 style={{ 
                   backgroundColor: balls.find(b => b.number === i+8)?.pocketed ? 'transparent' : balls.find(b => b.number === i+8)?.color,
                   opacity: balls.find(b => b.number === i+8)?.pocketed ? 0.3 : 1,
@@ -343,8 +382,8 @@ const BilliardTable = ({ isPracticeMode = false }: BilliardTableProps) => {
         <Button variant="ghost" className="glass" onClick={() => adjustAim('left')}>
           Aim Left
         </Button>
-        <Button variant="ghost" className="glass" onClick={toggleFocusMode}>
-          {focusMode ? "Normal View" : "Focus Mode"}
+        <Button variant="ghost" className="glass" onClick={toggleFineControl}>
+          {fineControl ? "Standard Aim" : "Fine Control"}
         </Button>
         <Button variant="ghost" className="glass" onClick={() => adjustAim('right')}>
           Aim Right
@@ -357,7 +396,8 @@ const BilliardTable = ({ isPracticeMode = false }: BilliardTableProps) => {
           <p>• Click and hold on the cue ball to aim</p>
           <p>• Drag away from the cue ball to increase power</p>
           <p>• Release to take the shot</p>
-          <p>• Use Focus Mode for better precision</p>
+          <p>• Use the English control in the bottom left to add spin</p>
+          <p>• Use "Fine Control" for precise aiming</p>
         </div>
       </div>
     </div>
@@ -365,3 +405,29 @@ const BilliardTable = ({ isPracticeMode = false }: BilliardTableProps) => {
 };
 
 export default BilliardTable;
+
+// Add styles for striped balls
+const styles = `
+  .striped-ball::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 50%;
+    background-color: white;
+    border-top-left-radius: 100%;
+    border-top-right-radius: 100%;
+  }
+  
+  .ball-shadow {
+    box-shadow: 0 3px 6px rgba(0,0,0,0.3), inset 0 -3px 6px rgba(0,0,0,0.2), inset 0 3px 3px rgba(255,255,255,0.3);
+  }
+`;
+
+// Inject the styles
+if (typeof document !== 'undefined') {
+  const styleSheet = document.createElement('style');
+  styleSheet.textContent = styles;
+  document.head.appendChild(styleSheet);
+}

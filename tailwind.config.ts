@@ -55,9 +55,13 @@ const config: Config = {
         },
         pool: {
           felt: "#0d6b99",
+          feltDark: "#074d70",
           wood: "#8B4513",
           blue: "#1a2b4c",
-          gold: "#f0b90b"
+          gold: "#f0b90b",
+          cueTip: "#a3d4ff",
+          cueWood: "#B86125",
+          focusMode: "#054663"
         },
       },
       borderRadius: {
@@ -77,11 +81,19 @@ const config: Config = {
           from: { height: "var(--radix-accordion-content-height)", opacity: "1" },
           to: { height: "0", opacity: "0" },
         },
+        "pulse-subtle": {
+          "0%, 100%": { opacity: "0.8" },
+          "50%": { opacity: "0.4" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "pulse-subtle": "pulse-subtle 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
       },
+      backgroundImage: {
+        'table-felt': 'radial-gradient(circle at center, #0691d9 0%, #054663 100%)',
+      }
     },
   },
   plugins: [require("tailwindcss-animate")],
