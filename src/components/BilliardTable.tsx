@@ -69,6 +69,7 @@ const BilliardTable = ({
       clearInterval(powerInterval);
       setLastShotInfo({angle: aimAngle, power: power});
       takeShot(english);
+      setIsPoweringUp(false); // Explicitly set isPoweringUp to false on mouse up
       document.removeEventListener('mouseup', handleMouseUp);
       document.removeEventListener('mousemove', handleMouseMoveListener);
     };
@@ -309,6 +310,7 @@ const BilliardTable = ({
             position={cueBallPosition}
             isPoweringUp={isPoweringUp}
             english={english}
+            isBreakShot={isBreakShot}
           />
         )}
         

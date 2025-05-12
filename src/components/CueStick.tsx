@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import { TABLE_WIDTH, TABLE_HEIGHT } from "@/utils/GamePhysics";
 
@@ -7,9 +8,10 @@ interface CueStickProps {
   position: { x: number, y: number };
   isPoweringUp: boolean;
   english: { x: number, y: number };
+  isBreakShot?: boolean;
 }
 
-const CueStick = ({ aimAngle, power, position, isPoweringUp, english }: CueStickProps) => {
+const CueStick = ({ aimAngle, power, position, isPoweringUp, english, isBreakShot = false }: CueStickProps) => {
   const [cueColor, setCueColor] = useState("#B86125"); // Default wood color
   
   // Adjust offset to position cue stick more accurately
@@ -50,12 +52,13 @@ const CueStick = ({ aimAngle, power, position, isPoweringUp, english }: CueStick
     }
   }, [power]);
   
+  // Early return if not powering up or position is missing
   if (!isPoweringUp || !position) return null;
   
   // Calculate cue stick position with offset from ball
   // This is crucial - we need to position the cue AWAY from the ball
-  const stickX = position.x - Math.cos(aimAngle) * offset;
-  const stickY = position.y - Math.sin(aimAngle) * offset;
+  const stickX = position.x + Math.cos(aimAngle) * offset;
+  const stickY = position.y + Math.sin(aimAngle) * offset;
   
   // Calculate cue stick length based on power for visual feedback
   // Increased base length to match the reference image
@@ -65,13 +68,13 @@ const CueStick = ({ aimAngle, power, position, isPoweringUp, english }: CueStick
     <>
       {/* Cue stick base */}
       <div 
-        className="absolute h-3 rounded-full transform origin-left"
+        className="absolute h-3 rounded-full transform origin-right"
         style={{
           backgroundImage: `linear-gradient(90deg, ${cueColor} 50%, #8B4513 98%)`,
           top: `${stickY / TABLE_HEIGHT * 100}%`,
           left: `${stickX / TABLE_WIDTH * 100}%`,
           width: `${cueLength}%`,
-          transform: `translate(0, -50%) rotate(${aimAngle}rad)`,
+          transform: `translate(0, -50%) rotate(${aimAngle + Math.PI}rad)`,
           zIndex: 20,
           boxShadow: "0 2px 4px rgba(0,0,0,0.5)"
         }}
@@ -84,24 +87,24 @@ const CueStick = ({ aimAngle, power, position, isPoweringUp, english }: CueStick
       
       {/* Cue tip */}
       <div 
-        className="absolute h-3 w-4 bg-blue-300 rounded-sm transform origin-left"
+        className="absolute h-3 w-4 bg-blue-300 rounded-sm transform origin-right"
         style={{
           top: `${stickY / TABLE_HEIGHT * 100}%`,
           left: `${stickX / TABLE_WIDTH * 100}%`,
-          transform: `translate(0, -50%) rotate(${aimAngle}rad)`,
+          transform: `translate(0, -50%) rotate(${aimAngle + Math.PI}rad)`,
           zIndex: 21
         }}
       ></div>
       
       {/* Power indicator */}
       <div 
-        className="absolute h-1.5 transform origin-left"
+        className="absolute h-1.5 transform origin-right"
         style={{
           background: `linear-gradient(90deg, rgba(255,255,255,0.7), transparent)`,
           top: `${stickY / TABLE_HEIGHT * 100}%`,
           left: `${stickX / TABLE_WIDTH * 100}%`,
           width: `${power * 0.6}px`,
-          transform: `translate(0, -50%) rotate(${aimAngle}rad)`,
+          transform: `translate(0, -50%) rotate(${aimAngle + Math.PI}rad)`,
           zIndex: 19,
           opacity: 0.7
         }}
@@ -110,18 +113,20 @@ const CueStick = ({ aimAngle, power, position, isPoweringUp, english }: CueStick
       {renderEnglishIndicator()}
       
       {/* Only show Break Shot Indicator during the break shot */}
-      <div
-        className="absolute flex items-center justify-center bg-blue-800 px-4 py-1.5 rounded-full text-white text-sm"
-        style={{
-          top: "15%",
-          left: "50%",
-          transform: "translateX(-50%)",
-          zIndex: 30
-        }}
-      >
-        <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
-        Break Shot
-      </div>
+      {isBreakShot && (
+        <div
+          className="absolute flex items-center justify-center bg-blue-800 px-4 py-1.5 rounded-full text-white text-sm"
+          style={{
+            top: "15%",
+            left: "50%",
+            transform: "translateX(-50%)",
+            zIndex: 30
+          }}
+        >
+          <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+          Break Shot
+        </div>
+      )}
     </>
   );
 };
