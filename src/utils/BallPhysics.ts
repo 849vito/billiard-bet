@@ -1,4 +1,3 @@
-// This should be in /src/utils/BallPhysics.ts
 import Matter from 'matter-js';
 import { BallType, BALL_RADIUS } from './GamePhysics';
 
@@ -40,6 +39,23 @@ export const applyEnglish = (
   }
   
   return { force, spin };
+};
+
+// Function to calculate ball reflection after collision
+export const calculateReflection = (
+  incidentVector: Matter.Vector,
+  surfaceNormal: Matter.Vector
+) => {
+  // Calculate dot product
+  const dot = incidentVector.x * surfaceNormal.x + incidentVector.y * surfaceNormal.y;
+  
+  // Calculate reflection vector using the reflection formula
+  const reflection = {
+    x: incidentVector.x - 2 * dot * surfaceNormal.x,
+    y: incidentVector.y - 2 * dot * surfaceNormal.y
+  };
+  
+  return reflection;
 };
 
 // Calculate the predicted trajectory path with multiple bounces
@@ -167,7 +183,7 @@ export const handleBallCollision = (
   };
 };
 
-// Improved function to simulate the physics of a cue stick striking the cue ball
+// Completely revised function to ensure the cue ball moves no matter what
 export const simulateCueStrike = (
   cueBall: Matter.Body,
   angle: number,
@@ -179,80 +195,68 @@ export const simulateCueStrike = (
     return;
   }
   
-  // Debug logs to track function execution
-  console.log(`SHOOTING: simulateCueStrike called with angle=${angle.toFixed(2)}, power=${power}`);
+  console.log(`EMERGENCY SHOT MODE: Angle=${angle.toFixed(2)}, Power=${power}`);
   
-  // Ensure we have some minimum power to prevent "no movement" bugs
-  const minPower = 20; // Increased minimum power even more
-  const adjustedPower = Math.max(power, minPower);
+  // Use a very high power value - this is crucial
+  const forceMagnitude = Math.max(50, power) * 0.1;
   
-  // IMPORTANT: Force factor is now MUCH higher to ensure ball moves
-  const forceFactor = Math.pow(adjustedPower / 100, 1.0) * 5.0; // Increased by 5x
+  // Calculate direction vector
+  const dirX = Math.cos(angle);
+  const dirY = Math.sin(angle);
   
-  // Calculate force direction based on angle
-  const forceDirection = {
-    x: Math.cos(angle),
-    y: Math.sin(angle)
-  };
+  // CRITICAL FIX #1: Reset any existing forces or velocities
+  Matter.Body.setVelocity(cueBall, { x: 0, y: 0 });
+  Matter.Body.setAngularVelocity(cueBall, 0);
   
-  console.log(`SHOOTING: Force direction (${forceDirection.x.toFixed(2)}, ${forceDirection.y.toFixed(2)}), magnitude=${forceFactor.toFixed(2)}`);
+  // CRITICAL FIX #2: Ensure the ball is awake and mobile
+  Matter.Sleeping.set(cueBall, false);
+  Matter.Body.setStatic(cueBall, false);
   
-  // CRITICAL FIX: Use setPosition to bump the ball slightly in the direction of the shot
-  // This ensures the ball starts moving even if physics engine is sleeping it
-  const initialBump = 0.1; // Small bump to ensure physics engine recognizes movement
-  Matter.Body.setPosition(cueBall, {
-    x: cueBall.position.x + forceDirection.x * initialBump,
-    y: cueBall.position.y + forceDirection.y * initialBump
-  });
-  
-  // Apply main force to the cue ball with GREATLY increased magnitude
-  const forcePoint = { 
-    x: cueBall.position.x, 
-    y: cueBall.position.y 
-  };
-  
-  const force = {
-    x: forceDirection.x * forceFactor,
-    y: forceDirection.y * forceFactor
-  };
-  
-  // Directly set velocity first - this is the most reliable way to ensure movement
-  const velocityMultiplier = 500; // Massively increased velocity
+  // BRUTE FORCE APPROACH: Apply massive velocity directly
+  // This is the most reliable way to make the ball move
   const velocity = {
-    x: forceDirection.x * forceFactor * velocityMultiplier,
-    y: forceDirection.y * forceFactor * velocityMultiplier
+    x: dirX * forceMagnitude * 20,
+    y: dirY * forceMagnitude * 20
   };
   
-  console.log(`SHOOTING: Setting velocity to (${velocity.x.toFixed(2)}, ${velocity.y.toFixed(2)})`);
+  console.log(`Setting velocity to: (${velocity.x.toFixed(2)}, ${velocity.y.toFixed(2)})`);
   Matter.Body.setVelocity(cueBall, velocity);
   
-  // THEN apply force - belt and suspenders approach
-  console.log(`SHOOTING: Applying force (${force.x.toFixed(2)}, ${force.y.toFixed(2)}) at point (${forcePoint.x.toFixed(2)}, ${forcePoint.y.toFixed(2)})`);
-  Matter.Body.applyForce(cueBall, forcePoint, force);
+  // BACKUP METHOD: Physically move the ball a small amount
+  const initialPos = { ...cueBall.position };
+  const newPos = {
+    x: initialPos.x + dirX * 2,
+    y: initialPos.y + dirY * 2
+  };
   
-  // Apply spin/english effects
-  if (english.x !== 0 || english.y !== 0) {
-    // Side spin (english.x) affects the ball's path slightly
-    const sideSpin = english.x * 0.001 * adjustedPower;
-    Matter.Body.applyForce(cueBall, cueBall.position, {
-      x: -forceDirection.y * sideSpin,
-      y: forceDirection.x * sideSpin
-    });
-    
-    // Top/bottom spin (english.y) affects roll and eventual speed
-    const topSpin = english.y * 0.01;
-    Matter.Body.setAngularVelocity(cueBall, topSpin);
-  }
+  console.log(`Moving ball from (${initialPos.x.toFixed(2)}, ${initialPos.y.toFixed(2)}) to (${newPos.x.toFixed(2)}, ${newPos.y.toFixed(2)})`);
+  Matter.Body.setPosition(cueBall, newPos);
   
-  // Wake up the ball if it's sleeping (critical for Physics engines)
-  Matter.Sleeping.set(cueBall, false);
+  // Record initial position and velocity for debugging
+  const initialVelocity = { ...cueBall.velocity };
   
-  // Print ball properties to check for issues
-  console.log(`SHOOTING: Cue ball properties after strike:
-    position: (${cueBall.position.x.toFixed(2)}, ${cueBall.position.y.toFixed(2)})
-    velocity: (${cueBall.velocity.x.toFixed(2)}, ${cueBall.velocity.y.toFixed(2)})
-    speed: ${Math.sqrt(cueBall.velocity.x * cueBall.velocity.x + cueBall.velocity.y * cueBall.velocity.y).toFixed(2)}
-    isStatic: ${cueBall.isStatic}
-    isSleeping: ${cueBall.isSleeping}
-  `);
+  // Schedule a check to ensure the ball is actually moving
+  setTimeout(() => {
+    if (cueBall.position && cueBall.velocity) {
+      const currentVelocity = { ...cueBall.velocity };
+      const currentPos = { ...cueBall.position };
+      
+      const speed = Math.sqrt(currentVelocity.x * currentVelocity.x + currentVelocity.y * currentVelocity.y);
+      console.log(`After 50ms: Ball speed is ${speed.toFixed(2)}, position: (${currentPos.x.toFixed(2)}, ${currentPos.y.toFixed(2)})`);
+      
+      // If ball barely moved, force it again with even higher velocity
+      if (speed < 5 || 
+          (Math.abs(currentPos.x - initialPos.x) < 1 && Math.abs(currentPos.y - initialPos.y) < 1)) {
+        console.log("EMERGENCY OVERRIDE: Ball not moving enough, applying extreme velocity");
+        
+        const emergencyVelocity = {
+          x: dirX * 100,
+          y: dirY * 100
+        };
+        
+        Matter.Body.setVelocity(cueBall, emergencyVelocity);
+        Matter.Sleeping.set(cueBall, false);
+      }
+    }
+  }, 50);
 };
