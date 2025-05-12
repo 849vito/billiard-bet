@@ -1,4 +1,3 @@
-
 import { useCallback, useEffect, useState, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { useGame } from "@/context/GameContext";
@@ -45,8 +44,7 @@ const BilliardTable = ({
     playerTurn,
     playerType,
     isBreakShot,
-    eightBallPocketable,
-    setIsPoweringUp
+    eightBallPocketable
   } = useBilliardPhysics(isPracticeMode, { onShotTaken, onBallPocketed });
   
   const [aimDirection, setAimDirection] = useState(0);
@@ -96,7 +94,13 @@ const BilliardTable = ({
       }
       
       setLastShotInfo({angle: aimAngle, power: power});
-      takeShot(english);
+      
+      // Call takeShot with a very short timeout to ensure state updates happen first
+      // This is a key fix - it ensures that the shot is taken AFTER event state is updated
+      setTimeout(() => {
+        takeShot(english);
+      }, 10);
+      
       document.removeEventListener('mouseup', handleMouseUp);
       document.removeEventListener('mousemove', handleMouseMoveListener);
     };

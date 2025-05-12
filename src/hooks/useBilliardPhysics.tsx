@@ -672,22 +672,32 @@ export const useBilliardPhysics = (isPracticeMode: boolean = false, props?: UseB
   
   // Take the shot
   const takeShot = useCallback((english: { x: number, y: number } = { x: 0, y: 0 }) => {
-    // Important: Check if we're in aiming state before proceeding
-    if (gameState !== 'aiming' || !initialMouseRef.current) {
-      // Reset the isPoweringUp state if we're not actually taking a shot
-      setIsPoweringUp(false); 
+    // Important: Always reset isPoweringUp first
+    setIsPoweringUp(false);
+    
+    // Add debug logging to track what's happening
+    console.log('Taking shot. Game state:', gameState, 'isPoweringUp:', isPoweringUp);
+    
+    // Check if we're in a valid state to take a shot
+    if (gameState !== 'aiming') {
+      console.log('Not in aiming state, cannot take shot');
+      // Make sure to update game state back to waiting if we're not shooting
+      setGameState('waiting');
       return;
     }
     
-    // Properly set states for shooting
-    setIsPoweringUp(false);
+    // Clear any remaining references
+    initialMouseRef.current = null;
+    currentMouseRef.current = null;
+    
+    // Set shooting state
     setShowTrajectory(false);
     setGameState('shooting');
     
     // Find cue ball
     const cueBall = ballBodiesRef.current.find(ball => ball.label === 'ball-0');
     if (!cueBall || !worldRef.current) {
-      // If we couldn't find the cue ball, reset the state
+      console.error('Could not find cue ball!');
       setGameState('waiting');
       return;
     }
@@ -695,8 +705,10 @@ export const useBilliardPhysics = (isPracticeMode: boolean = false, props?: UseB
     // Use the calculated angle from aiming
     const angle = aimAngle;
     
-    // Call the simulateCueStrike function properly
-    simulateCueStrike(cueBall, angle, power, english);
+    // Apply the shot with significantly increased force
+    console.log('Applying force to ball with angle:', angle, 'power:', power);
+    // Call the simulateCueStrike function with increased power
+    simulateCueStrike(cueBall, angle, power * 1.5, english);
     
     setMessage(`Shot taken with ${power}% power!`);
     
@@ -712,13 +724,9 @@ export const useBilliardPhysics = (isPracticeMode: boolean = false, props?: UseB
     
     setPower(0);
     
-    // Reset references
-    initialMouseRef.current = null;
-    currentMouseRef.current = null;
-    
     // Clear trajectory
     setTrajectoryPoints([]);
-  }, [aimAngle, gameState, isAuthenticated, power, props, user]);
+  }, [aimAngle, gameState, isPoweringUp, isAuthenticated, power, props, user]);
   
   // Update the trajectory line based on aim
   const updateTrajectory = useCallback((startX: number, startY: number, targetX: number, targetY: number) => {
