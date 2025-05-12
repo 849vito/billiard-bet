@@ -1,4 +1,3 @@
-
 import Matter from 'matter-js';
 
 // Constants for physics engine
@@ -38,24 +37,27 @@ export const BALL_COLORS = {
   15: 'brown'
 };
 
-// Table setup
+// Modified setupTable function with more aggressive physics settings
 export const setupTable = () => {
   // Initialize Matter.js modules
   const Engine = Matter.Engine;
   const World = Matter.World;
   const Bodies = Matter.Bodies;
   
-  // Create engine and world with optimized settings for billiards
+  // Create engine with aggressive settings for billiards
   const engine = Engine.create({
-    enableSleeping: false, // CRITICAL: Disable sleeping for billiards
+    enableSleeping: false, // CRUCIAL: Never allow balls to sleep
+    positionIterations: 12, // Increase position iterations for better accuracy
+    velocityIterations: 8,  // Increase velocity iterations for better accuracy
     timing: { 
-      timeScale: 1.0, // Normal time scale
-      delta: 1000/60, // 60 FPS
-      correction: 1 // Full correction
-    }
+      timeScale: 1.2,        // Slightly faster simulation
+      delta: 1000/120,       // Higher framerate for physics
+      correction: 1          // Full correction
+    },
+    constraintIterations: 4  // More constraint iterations for better contact resolution
   });
   
-  // No gravity in pool
+  // Zero gravity is essential for billiards
   engine.gravity.scale = 0;
   engine.gravity.x = 0;
   engine.gravity.y = 0;
@@ -187,25 +189,36 @@ const createRackFormation = (startX: number, startY: number) => {
   return positions;
 };
 
-// Create balls
+// Modified createBalls function with better physics properties
 export const createBalls = () => {
   const balls = [];
   const Bodies = Matter.Bodies;
 
-  // Create cue ball
+  // Create cue ball with enhanced physics properties
   const cueBall = Bodies.circle(
     TABLE_WIDTH * 0.25, // Position on the left side of the table
     TABLE_HEIGHT / 2,
     BALL_RADIUS,
     {
-      restitution: RESTITUTION,
-      friction: FRICTION,
-      frictionAir: 0.015,
-      density: 0.8,
+      restitution: 0.8,     // More bounce
+      friction: 0.1,        // Less friction for better rolling
+      frictionAir: 0.002,   // Much less air friction
+      density: 0.5,         // Lower density for better momentum transfer
+      frictionStatic: 0.1,  // Lower static friction
       label: 'ball-0',
-      render: { fillStyle: BALL_COLORS[0] }
+      render: { fillStyle: BALL_COLORS[0] },
+      collisionFilter: {    // Ensure it can collide with everything
+        group: 0,
+        category: 0xFFFF,
+        mask: 0xFFFF
+      }
     }
   );
+  
+  // Set initial velocity to zero explicitly
+  Matter.Body.setVelocity(cueBall, { x: 0, y: 0 });
+  Matter.Body.setAngularVelocity(cueBall, 0);
+  
   balls.push(cueBall);
   
   // Create rack formation for the other 15 balls
@@ -216,19 +229,25 @@ export const createBalls = () => {
   // Get optimal rack positions
   const rackPositions = createRackFormation(rackX, rackY);
   
-  // Create balls in rack formation
+  // Create balls in rack formation with improved physics properties
   rackPositions.forEach(position => {
     const ball = Bodies.circle(
       position.x,
       position.y,
       BALL_RADIUS,
       {
-        restitution: RESTITUTION,
-        friction: FRICTION,
-        frictionAir: 0.015,
-        density: 0.8,
+        restitution: 0.8,       // More bounce
+        friction: 0.1,          // Less friction for better rolling
+        frictionAir: 0.002,     // Much less air friction
+        density: 0.5,           // Lower density for better momentum transfer
+        frictionStatic: 0.1,    // Lower static friction
         label: `ball-${position.number}`,
-        render: { fillStyle: BALL_COLORS[position.number] }
+        render: { fillStyle: BALL_COLORS[position.number] },
+        collisionFilter: {      // Ensure it can collide with everything
+          group: 0,
+          category: 0xFFFF,
+          mask: 0xFFFF
+        }
       }
     );
     balls.push(ball);
