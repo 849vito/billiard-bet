@@ -672,7 +672,7 @@ export const useBilliardPhysics = (isPracticeMode: boolean = false, props?: UseB
   
   // Take the shot
   const takeShot = useCallback((english: { x: number, y: number } = { x: 0, y: 0 }) => {
-    console.log("TAKING SHOT - Current state:", { gameState, isPoweringUp, power, aimAngle });
+    console.log("TAKING POWERFUL SHOT - Current power:", power);
     
     // Always reset powering up state immediately
     setIsPoweringUp(false);
@@ -685,8 +685,8 @@ export const useBilliardPhysics = (isPracticeMode: boolean = false, props?: UseB
     // Force game state to shooting
     setGameState('shooting');
     
-    // Create a function that will actually apply the shot
-    const applyShot = () => {
+    // Create a function that will actually apply the shot with proper power
+    const applyPowerfulShot = () => {
       // Find cue ball - must exist for a shot
       const cueBall = ballBodiesRef.current.find(ball => ball.label === 'ball-0');
       if (!cueBall) {
@@ -701,27 +701,21 @@ export const useBilliardPhysics = (isPracticeMode: boolean = false, props?: UseB
         return;
       }
       
-      // Mandatory debug info
-      console.log("Found cue ball:", {
-        position: cueBall.position,
-        velocity: cueBall.velocity,
-        isStatic: cueBall.isStatic,
-        isSleeping: cueBall.isSleeping,
-      });
+      // CRITICAL FIX: Store the original power BEFORE resetting it
+      const shotPower = power;
       
-      // Use higher power for more visible movement
-      const effectivePower = Math.max(power, 30) * 2;
+      // Amplify the power for more visible movement - this is critical!
+      const amplifiedPower = Math.max(shotPower * 2, 40);
       
-      // Apply the shot - CRITICAL CALL
-      simulateCueStrike(cueBall, aimAngle, effectivePower, english);
+      console.log(`Taking shot with original power=${shotPower}, amplified power=${amplifiedPower}`);
       
-      // Log the shot for confirmation
-      console.log(`Shot applied with angle=${aimAngle.toFixed(2)}, power=${effectivePower}`);
+      // Apply the shot with AMPLIFIED power
+      simulateCueStrike(cueBall, aimAngle, amplifiedPower, english);
       
       // Update message
-      setMessage(`Shot taken with ${power}% power!`);
+      setMessage(`Shot taken with ${shotPower}% power!`);
       
-      // Reset power
+      // Reset power AFTER applying the shot
       setPower(0);
       
       // Clear trajectory
@@ -736,40 +730,11 @@ export const useBilliardPhysics = (isPracticeMode: boolean = false, props?: UseB
       if (isAuthenticated && user) {
         saveShot(false);
       }
-      
-      // Schedule a check to ensure the ball is moving
-      setTimeout(() => {
-        if (cueBall.position && cueBall.velocity) {
-          const speed = Math.sqrt(
-            cueBall.velocity.x * cueBall.velocity.x + 
-            cueBall.velocity.y * cueBall.velocity.y
-          );
-          
-          console.log(`After 100ms: Ball speed is ${speed.toFixed(2)}`);
-          
-          // If ball still not moving, try one more desperate attempt
-          if (speed < 0.5) {
-            console.error("EMERGENCY: Ball still not moving after 100ms, forcing position change");
-            
-            // Directly move the ball in the shot direction
-            const newPos = {
-              x: cueBall.position.x + Math.cos(aimAngle) * 10,
-              y: cueBall.position.y + Math.sin(aimAngle) * 10
-            };
-            
-            Matter.Body.setPosition(cueBall, newPos);
-            Matter.Body.setVelocity(cueBall, {
-              x: Math.cos(aimAngle) * 50,
-              y: Math.sin(aimAngle) * 50
-            });
-          }
-        }
-      }, 100);
     };
     
-    // Run the shot application after a very short delay to ensure state updates
-    setTimeout(applyShot, 10);
-  }, [aimAngle, gameState, isAuthenticated, isPoweringUp, power, props, user]);
+    // Run the shot application immediately to ensure power is captured
+    applyPowerfulShot();
+  }, [aimAngle, gameState, isAuthenticated, power, props, user]);
     
   // Update the trajectory line based on aim
   const updateTrajectory = useCallback((startX: number, startY: number, targetX: number, targetY: number) => {
