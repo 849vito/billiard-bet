@@ -672,64 +672,104 @@ export const useBilliardPhysics = (isPracticeMode: boolean = false, props?: UseB
   
   // Take the shot
   const takeShot = useCallback((english: { x: number, y: number } = { x: 0, y: 0 }) => {
-    console.log("takeShot called with gameState:", gameState);
+    console.log("TAKING SHOT - Current state:", { gameState, isPoweringUp, power, aimAngle });
     
-    // Always reset isPoweringUp immediately
+    // Always reset powering up state immediately
     setIsPoweringUp(false);
+    setShowTrajectory(false);
     
-    // Clear any pending power intervals for safety
+    // Reset references
     initialMouseRef.current = null;
     currentMouseRef.current = null;
     
-    // If we're not in aiming state, we can't take a shot
-    if (gameState !== 'aiming') {
-      console.log("Not in aiming state, cannot take shot");
-      setGameState('waiting');
-      return;
-    }
-    
-    // Set shooting state BEFORE finding the ball to avoid race conditions
-    setShowTrajectory(false);
+    // Force game state to shooting
     setGameState('shooting');
     
-    // Execute this with a tiny delay to ensure state changes are processed
-    setTimeout(() => {
-      // Find cue ball
+    // Create a function that will actually apply the shot
+    const applyShot = () => {
+      // Find cue ball - must exist for a shot
       const cueBall = ballBodiesRef.current.find(ball => ball.label === 'ball-0');
-      if (!cueBall || !worldRef.current) {
-        console.error('Could not find cue ball for shot!');
+      if (!cueBall) {
+        console.error("NO CUE BALL FOUND FOR SHOT!");
         setGameState('waiting');
         return;
       }
       
-      console.log("Taking shot with:", { 
-        angle: aimAngle, 
-        power: power, 
-        english: english,
-        ballPosition: cueBall.position
+      if (!worldRef.current) {
+        console.error("NO WORLD FOUND FOR SHOT!");
+        setGameState('waiting');
+        return;
+      }
+      
+      // Mandatory debug info
+      console.log("Found cue ball:", {
+        position: cueBall.position,
+        velocity: cueBall.velocity,
+        isStatic: cueBall.isStatic,
+        isSleeping: cueBall.isSleeping,
       });
       
-      // Apply the shot with increased power
-      simulateCueStrike(cueBall, aimAngle, power * 2.0, english); // Double the power
+      // Use higher power for more visible movement
+      const effectivePower = Math.max(power, 30) * 2;
       
+      // Apply the shot - CRITICAL CALL
+      simulateCueStrike(cueBall, aimAngle, effectivePower, english);
+      
+      // Log the shot for confirmation
+      console.log(`Shot applied with angle=${aimAngle.toFixed(2)}, power=${effectivePower}`);
+      
+      // Update message
       setMessage(`Shot taken with ${power}% power!`);
       
-      // Callback when a shot is taken
-      if (props?.onShotTaken) {
-        props.onShotTaken();
-      }
-      
-      // Save shot to Supabase if authenticated
-      if (isAuthenticated && user) {
-        saveShot(false);
-      }
-      
+      // Reset power
       setPower(0);
       
       // Clear trajectory
       setTrajectoryPoints([]);
-    }, 20); // Slight delay to ensure state updates are processed
-  }, [aimAngle, gameState, isAuthenticated, power, props, user]);
+      
+      // Call event handlers
+      if (props?.onShotTaken) {
+        props.onShotTaken();
+      }
+      
+      // Save if authenticated
+      if (isAuthenticated && user) {
+        saveShot(false);
+      }
+      
+      // Schedule a check to ensure the ball is moving
+      setTimeout(() => {
+        if (cueBall.position && cueBall.velocity) {
+          const speed = Math.sqrt(
+            cueBall.velocity.x * cueBall.velocity.x + 
+            cueBall.velocity.y * cueBall.velocity.y
+          );
+          
+          console.log(`After 100ms: Ball speed is ${speed.toFixed(2)}`);
+          
+          // If ball still not moving, try one more desperate attempt
+          if (speed < 0.5) {
+            console.error("EMERGENCY: Ball still not moving after 100ms, forcing position change");
+            
+            // Directly move the ball in the shot direction
+            const newPos = {
+              x: cueBall.position.x + Math.cos(aimAngle) * 10,
+              y: cueBall.position.y + Math.sin(aimAngle) * 10
+            };
+            
+            Matter.Body.setPosition(cueBall, newPos);
+            Matter.Body.setVelocity(cueBall, {
+              x: Math.cos(aimAngle) * 50,
+              y: Math.sin(aimAngle) * 50
+            });
+          }
+        }
+      }, 100);
+    };
+    
+    // Run the shot application after a very short delay to ensure state updates
+    setTimeout(applyShot, 10);
+  }, [aimAngle, gameState, isAuthenticated, isPoweringUp, power, props, user]);
     
   // Update the trajectory line based on aim
   const updateTrajectory = useCallback((startX: number, startY: number, targetX: number, targetY: number) => {
