@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import { TABLE_WIDTH, TABLE_HEIGHT, BALL_RADIUS } from "@/utils/GamePhysics";
 
@@ -23,9 +24,8 @@ const CueStick = ({
   // Calculate ball diameter in pixels for proper offsetting
   const ballDiameter = BALL_RADIUS * 2;
   
-  // Adjust offset to position cue stick more accurately
-  // Make sure stick is positioned AWAY from the ball with proper distance
-  const offset = ballDiameter + 10 + (power * 0.7); // Distance from cue ball center
+  // Increase offset to position cue stick properly away from the ball
+  const offset = ballDiameter + 20 + (power * 0.7); // Distance from cue ball center
   
   // Render an effect to show English being applied
   const renderEnglishIndicator = () => {
@@ -65,10 +65,9 @@ const CueStick = ({
   if (!isPoweringUp || !position) return null;
   
   // Calculate cue stick position with offset from ball
-  // This is crucial - we need to position the cue AWAY from the ball
-  // Use a NEGATIVE cosine/sine to place the cue in the OPPOSITE direction
-  const stickX = position.x + Math.cos(aimAngle) * offset;
-  const stickY = position.y + Math.sin(aimAngle) * offset;
+  // Position the cue AWAY from the ball in the OPPOSITE direction of aim
+  const stickX = position.x - Math.cos(aimAngle) * offset;
+  const stickY = position.y - Math.sin(aimAngle) * offset;
   
   // Calculate cue stick length based on power for visual feedback
   const cueLength = 35 + power * 0.2; // Percentage of table width
@@ -77,14 +76,13 @@ const CueStick = ({
     <>
       {/* Cue stick base */}
       <div 
-        className="absolute h-3 rounded-full transform origin-right"
+        className="absolute h-3 rounded-full transform origin-left"
         style={{
           backgroundImage: `linear-gradient(90deg, #8B4513 2%, ${cueColor} 50%)`,
           top: `${stickY / TABLE_HEIGHT * 100}%`,
           left: `${stickX / TABLE_WIDTH * 100}%`,
           width: `${cueLength}%`,
-          // Note the opposite rotation (aimAngle + Math.PI) and origin-right
-          transform: `translate(0, -50%) rotate(${aimAngle + Math.PI}rad)`,
+          transform: `translate(0, -50%) rotate(${aimAngle}rad)`,
           zIndex: 20,
           boxShadow: "0 2px 4px rgba(0,0,0,0.5)"
         }}
@@ -97,24 +95,24 @@ const CueStick = ({
       
       {/* Cue tip */}
       <div 
-        className="absolute h-3 w-4 bg-blue-300 rounded-sm transform origin-right"
+        className="absolute h-3 w-4 bg-blue-300 rounded-sm transform origin-left"
         style={{
           top: `${stickY / TABLE_HEIGHT * 100}%`,
           left: `${stickX / TABLE_WIDTH * 100}%`,
-          transform: `translate(0, -50%) rotate(${aimAngle + Math.PI}rad)`,
+          transform: `translate(0, -50%) rotate(${aimAngle}rad)`,
           zIndex: 21
         }}
       ></div>
       
       {/* Power indicator */}
       <div 
-        className="absolute h-1.5 transform origin-right"
+        className="absolute h-1.5 transform origin-left"
         style={{
           background: `linear-gradient(90deg, transparent, rgba(255,255,255,0.7))`,
           top: `${stickY / TABLE_HEIGHT * 100}%`,
           left: `${stickX / TABLE_WIDTH * 100}%`,
           width: `${power * 0.6}px`,
-          transform: `translate(0, -50%) rotate(${aimAngle + Math.PI}rad)`,
+          transform: `translate(0, -50%) rotate(${aimAngle}rad)`,
           zIndex: 19,
           opacity: 0.7
         }}

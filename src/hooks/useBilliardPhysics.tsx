@@ -70,6 +70,176 @@ export const useBilliardPhysics = (isPracticeMode: boolean = false, props?: UseB
   const firstBallHitRef = useRef<number | null>(null);
   const foulCommittedRef = useRef(false);
 
+  // Save shot data to Supabase
+  const saveShot = async (successful: boolean, ballsPocketed: number[] = []) => {
+    if (!isAuthenticated || !user) return;
+    
+    try {
+      // Get session id from localStorage or create one
+      let sessionId = localStorage.getItem('pool_practice_session_id');
+      
+      if (!sessionId) {
+        const { data, error } = await supabase
+          .from('practice_sessions')
+          .insert({
+            user_id: user.id,
+            shots_taken: 0,
+            balls_pocketed: 0
+          })
+          .select('id')
+          .single();
+          
+        if (error || !data) {
+          console.error("Failed to create practice session", error);
+          return;
+        }
+        
+        sessionId = data.id;
+        localStorage.setItem('pool_practice_session_id', sessionId);
+      }
+      
+      // Save shot data
+      await supabase
+        .from('practice_shots')
+        .insert({
+          session_id: sessionId,
+          user_id: user.id,
+          power,
+          angle: aimAngle,
+          balls_hit: firstBallHitRef.current ? [firstBallHitRef.current] : [],
+          balls_pocketed: ballsPocketed,
+          successful,
+          english_x: 0, // Could track english if implemented
+          english_y: 0
+        });
+    } catch (err) {
+      console.error("Error saving shot data:", err);
+    }
+  };
+
+  // Handle a ball being pocketed
+  const handlePocketedBall = useCallback((ballNumber: number) => {
+    // On break shot, check if any balls were pocketed or hit the rails
+    if (breakShotRef.current) {
+      if (ballNumber !== 0) {
+        setLegalBreak(true);
+      }
+      
+      // Determine player type based on first pocketed ball (excluding cue ball)
+      if (ballNumber > 0 && ballNumber < 8 && playerType === null) {
+        setPlayerType(BallType.SOLID);
+        toast.success("You are assigned Solid balls (1-7)");
+      } else if (ballNumber > 8 && playerType === null) {
+        setPlayerType(BallType.STRIPE);
+        toast.success("You are assigned Striped balls (9-15)");
+      }
+    }
+    
+    // Special handling for the cue ball (respawn it)
+    if (ballNumber === 0) {
+      setMessage("Scratch! Cue ball will be respawned.");
+      toast.error("You scratched! Turn will pass to opponent.");
+      
+      // Turn ends when you pocket the cue ball
+      turnEndedRef.current = true;
+      foulCommittedRef.current = true;
+      
+      // Wait a moment, then respawn cue ball
+      setTimeout(() => {
+        const newCueBall = Matter.Bodies.circle(
+          TABLE_WIDTH * 0.25,
+          TABLE_HEIGHT / 2,
+          BALL_RADIUS,
+          {
+            restitution: 0.7,
+            friction: 0.005,
+            frictionAir: 0.015,
+            density: 0.8,
+            label: 'ball-0',
+            render: { fillStyle: 'white' }
+          }
+        );
+        
+        if (!worldRef.current) return;
+        Matter.World.add(worldRef.current, newCueBall);
+        
+        // Update ref and state
+        ballBodiesRef.current = [
+          newCueBall,
+          ...ballBodiesRef.current.filter(b => b.label !== 'ball-0')
+        ];
+        
+        setBalls(prevBalls => 
+          prevBalls.map(b => 
+            b.number === 0 
+              ? { 
+                  ...b, 
+                  pocketed: false,
+                  position: { 
+                    x: TABLE_WIDTH * 0.25, 
+                    y: TABLE_HEIGHT / 2 
+                  } 
+                } 
+              : b
+          )
+        );
+        
+        // In practice mode, don't switch turns
+        if (isPracticeMode) {
+          setGameState('waiting');
+          setMessage("Your turn again!");
+        } else {
+          // Switch turns
+          setPlayerTurn('opponent');
+          setGameState('opponent-turn');
+          setMessage("Opponent's turn");
+        }
+      }, 1500);
+    } else if (ballNumber === 8) {
+      // 8-ball handling
+      const solidsRemaining = balls.filter(b => b.number > 0 && b.number < 8 && !b.pocketed).length;
+      const stripesRemaining = balls.filter(b => b.number > 8 && !b.pocketed).length;
+      
+      if ((playerType === BallType.SOLID && solidsRemaining === 0) || 
+          (playerType === BallType.STRIPE && stripesRemaining === 0)) {
+        setMessage("8-ball pocketed! You win!");
+        toast.success("You win! All your balls and the 8-ball were pocketed.");
+        setGameState('game-over');
+      } else {
+        setMessage("8-ball pocketed too early! You lose!");
+        toast.error("You lost! You pocketed the 8-ball before clearing your balls.");
+        setGameState('game-over');
+      }
+    } else {
+      // Regular ball pocketed
+      const ballTypePocketed = ballNumber < 8 ? BallType.SOLID : BallType.STRIPE;
+      
+      // In practice mode, always allow player to keep shooting
+      if (isPracticeMode) {
+        setMessage(`Ball ${ballNumber} pocketed! Continue your turn.`);
+      } else {
+        // First pocketed ball determines player type if not already set
+        if (playerType === null) {
+          setPlayerType(ballTypePocketed);
+          toast.success(`You are assigned ${ballTypePocketed === BallType.SOLID ? 'Solid' : 'Striped'} balls`);
+        }
+        
+        // Check if player pocketed the right type
+        if (playerType === ballTypePocketed) {
+          setMessage(`Ball ${ballNumber} pocketed! You can shoot again.`);
+        } else {
+          setMessage(`Ball ${ballNumber} pocketed! Opponent's ball.`);
+          turnEndedRef.current = true;
+        }
+      }
+    }
+    
+    // Save the pocketed ball to Supabase if authenticated
+    if (isAuthenticated && user && ballNumber > 0) {
+      saveShot(true, [ballNumber]);
+    }
+  }, [balls, isPracticeMode, playerType, isAuthenticated, user]);
+
   // Simulate opponent's turn (for non-practice mode)
   const simulateOpponentShot = useCallback(() => {
     if (!worldRef.current) return;
@@ -413,177 +583,7 @@ export const useBilliardPhysics = (isPracticeMode: boolean = false, props?: UseB
         clearTimeout(shotTimerRef.current);
       }
     };
-  }, [gameState, handlePocketedBall, props]);
-  
-  // Handle a ball being pocketed
-  const handlePocketedBall = useCallback((ballNumber: number) => {
-    // On break shot, check if any balls were pocketed or hit the rails
-    if (breakShotRef.current) {
-      if (ballNumber !== 0) {
-        setLegalBreak(true);
-      }
-      
-      // Determine player type based on first pocketed ball (excluding cue ball)
-      if (ballNumber > 0 && ballNumber < 8 && playerType === null) {
-        setPlayerType(BallType.SOLID);
-        toast.success("You are assigned Solid balls (1-7)");
-      } else if (ballNumber > 8 && playerType === null) {
-        setPlayerType(BallType.STRIPE);
-        toast.success("You are assigned Striped balls (9-15)");
-      }
-    }
-    
-    // Special handling for the cue ball (respawn it)
-    if (ballNumber === 0) {
-      setMessage("Scratch! Cue ball will be respawned.");
-      toast.error("You scratched! Turn will pass to opponent.");
-      
-      // Turn ends when you pocket the cue ball
-      turnEndedRef.current = true;
-      foulCommittedRef.current = true;
-      
-      // Wait a moment, then respawn cue ball
-      setTimeout(() => {
-        const newCueBall = Matter.Bodies.circle(
-          TABLE_WIDTH * 0.25,
-          TABLE_HEIGHT / 2,
-          BALL_RADIUS,
-          {
-            restitution: 0.7,
-            friction: 0.005,
-            frictionAir: 0.015,
-            density: 0.8,
-            label: 'ball-0',
-            render: { fillStyle: 'white' }
-          }
-        );
-        
-        if (!worldRef.current) return;
-        Matter.World.add(worldRef.current, newCueBall);
-        
-        // Update ref and state
-        ballBodiesRef.current = [
-          newCueBall,
-          ...ballBodiesRef.current.filter(b => b.label !== 'ball-0')
-        ];
-        
-        setBalls(prevBalls => 
-          prevBalls.map(b => 
-            b.number === 0 
-              ? { 
-                  ...b, 
-                  pocketed: false,
-                  position: { 
-                    x: TABLE_WIDTH * 0.25, 
-                    y: TABLE_HEIGHT / 2 
-                  } 
-                } 
-              : b
-          )
-        );
-        
-        // In practice mode, don't switch turns
-        if (isPracticeMode) {
-          setGameState('waiting');
-          setMessage("Your turn again!");
-        } else {
-          // Switch turns
-          setPlayerTurn('opponent');
-          setGameState('opponent-turn');
-          setMessage("Opponent's turn");
-        }
-      }, 1500);
-    } else if (ballNumber === 8) {
-      // 8-ball handling
-      const solidsRemaining = balls.filter(b => b.number > 0 && b.number < 8 && !b.pocketed).length;
-      const stripesRemaining = balls.filter(b => b.number > 8 && !b.pocketed).length;
-      
-      if ((playerType === BallType.SOLID && solidsRemaining === 0) || 
-          (playerType === BallType.STRIPE && stripesRemaining === 0)) {
-        setMessage("8-ball pocketed! You win!");
-        toast.success("You win! All your balls and the 8-ball were pocketed.");
-        setGameState('game-over');
-      } else {
-        setMessage("8-ball pocketed too early! You lose!");
-        toast.error("You lost! You pocketed the 8-ball before clearing your balls.");
-        setGameState('game-over');
-      }
-    } else {
-      // Regular ball pocketed
-      const ballTypePocketed = ballNumber < 8 ? BallType.SOLID : BallType.STRIPE;
-      
-      // In practice mode, always allow player to keep shooting
-      if (isPracticeMode) {
-        setMessage(`Ball ${ballNumber} pocketed! Continue your turn.`);
-      } else {
-        // First pocketed ball determines player type if not already set
-        if (playerType === null) {
-          setPlayerType(ballTypePocketed);
-          toast.success(`You are assigned ${ballTypePocketed === BallType.SOLID ? 'Solid' : 'Striped'} balls`);
-        }
-        
-        // Check if player pocketed the right type
-        if (playerType === ballTypePocketed) {
-          setMessage(`Ball ${ballNumber} pocketed! You can shoot again.`);
-        } else {
-          setMessage(`Ball ${ballNumber} pocketed! Opponent's ball.`);
-          turnEndedRef.current = true;
-        }
-      }
-    }
-    
-    // Save the pocketed ball to Supabase if authenticated
-    if (isAuthenticated && user && ballNumber > 0) {
-      saveShot(true, [ballNumber]);
-    }
-  }, [balls, isPracticeMode, playerType, isAuthenticated, user]);
-  
-  // Save shot data to Supabase
-  const saveShot = async (successful: boolean, ballsPocketed: number[] = []) => {
-    if (!isAuthenticated || !user) return;
-    
-    try {
-      // Get session id from localStorage or create one
-      let sessionId = localStorage.getItem('pool_practice_session_id');
-      
-      if (!sessionId) {
-        const { data, error } = await supabase
-          .from('practice_sessions')
-          .insert({
-            user_id: user.id,
-            shots_taken: 0,
-            balls_pocketed: 0
-          })
-          .select('id')
-          .single();
-          
-        if (error || !data) {
-          console.error("Failed to create practice session", error);
-          return;
-        }
-        
-        sessionId = data.id;
-        localStorage.setItem('pool_practice_session_id', sessionId);
-      }
-      
-      // Save shot data
-      await supabase
-        .from('practice_shots')
-        .insert({
-          session_id: sessionId,
-          user_id: user.id,
-          power,
-          angle: aimAngle,
-          balls_hit: firstBallHitRef.current ? [firstBallHitRef.current] : [],
-          balls_pocketed: ballsPocketed,
-          successful,
-          english_x: 0, // Could track english if implemented
-          english_y: 0
-        });
-    } catch (err) {
-      console.error("Error saving shot data:", err);
-    }
-  };
+  }, [gameState, handlePocketedBall, handleShotCompleted, props]);
   
   // Initialize game on component mount and when container size changes
   useEffect(() => {
@@ -870,6 +870,7 @@ export const useBilliardPhysics = (isPracticeMode: boolean = false, props?: UseB
     balls,
     power,
     isPoweringUp,
+    setIsPoweringUp,
     gameState,
     message,
     aimAngle,
