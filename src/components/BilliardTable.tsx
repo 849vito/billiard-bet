@@ -54,22 +54,47 @@ const BilliardTable = ({
   const [fineControl, setFineControl] = useState(false);
   const [lastShotInfo, setLastShotInfo] = useState<{angle: number, power: number} | null>(null);
   
+  // Keep track of mouse/touch events at component level
+  const isMouseDownRef = useRef(false);
+  const powerIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  
   // Handle mouse/touch interactions
   const handleMouseDown = (e: React.MouseEvent) => {
-    if (gameState !== 'waiting') return;
+    // Only allow shots when it's the player's turn and game is waiting
+    if (gameState !== 'waiting' || playerTurn !== 'player') return;
+    
+    isMouseDownRef.current = true;
     
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     
+    // Get position of cue ball
+    const cueBall = balls.find(ball => ball.number === 0 && !ball.pocketed);
+    if (!cueBall) return;
+    
+    // Calculate the angle from cue ball to mouse position
+    const dx = cueBall.position.x - x;
+    const dy = cueBall.position.y - y;
+    const angle = Math.atan2(dy, dx);
+    
+    // Start powering up
     const powerInterval = startPoweringUp(x, y, english);
+    powerIntervalRef.current = powerInterval;
     
     // Attach event listeners to handle shot
     const handleMouseUp = () => {
-      clearInterval(powerInterval);
+      if (!isMouseDownRef.current) return;
+      
+      isMouseDownRef.current = false;
+      
+      if (powerIntervalRef.current) {
+        clearInterval(powerIntervalRef.current);
+        powerIntervalRef.current = null;
+      }
+      
       setLastShotInfo({angle: aimAngle, power: power});
       takeShot(english);
-      setIsPoweringUp(false); // Explicitly set isPoweringUp to false on mouse up
       document.removeEventListener('mouseup', handleMouseUp);
       document.removeEventListener('mousemove', handleMouseMoveListener);
     };
@@ -88,18 +113,40 @@ const BilliardTable = ({
   };
 
   const handleTouchStart = (e: React.TouchEvent) => {
-    if (e.touches.length === 0 || gameState !== 'waiting') return;
+    // Only allow shots when it's the player's turn and game is waiting
+    if (e.touches.length === 0 || gameState !== 'waiting' || playerTurn !== 'player') return;
+    
+    isMouseDownRef.current = true;
     
     const rect = e.currentTarget.getBoundingClientRect();
     const touch = e.touches[0];
     const x = touch.clientX - rect.left;
     const y = touch.clientY - rect.top;
     
+    // Get position of cue ball
+    const cueBall = balls.find(ball => ball.number === 0 && !ball.pocketed);
+    if (!cueBall) return;
+    
+    // Calculate the angle from cue ball to touch position
+    const dx = cueBall.position.x - x;
+    const dy = cueBall.position.y - y;
+    const angle = Math.atan2(dy, dx);
+    
+    // Start powering up
     const powerInterval = startPoweringUp(x, y, english);
+    powerIntervalRef.current = powerInterval;
     
     // Attach event listeners to handle shot
     const handleTouchEnd = () => {
-      clearInterval(powerInterval);
+      if (!isMouseDownRef.current) return;
+      
+      isMouseDownRef.current = false;
+      
+      if (powerIntervalRef.current) {
+        clearInterval(powerIntervalRef.current);
+        powerIntervalRef.current = null;
+      }
+      
       setLastShotInfo({angle: aimAngle, power: power});
       takeShot(english);
       document.removeEventListener('touchend', handleTouchEnd);
@@ -121,6 +168,15 @@ const BilliardTable = ({
     document.addEventListener('touchend', handleTouchEnd);
     document.addEventListener('touchmove', handleTouchMoveListener);
   };
+  
+  // Clean up any intervals if component unmounts while powering up
+  useEffect(() => {
+    return () => {
+      if (powerIntervalRef.current) {
+        clearInterval(powerIntervalRef.current);
+      }
+    };
+  }, []);
   
   // Manual aim controls
   const adjustAim = (direction: 'left' | 'right') => {
@@ -343,9 +399,12 @@ const BilliardTable = ({
         {debugMode && (
           <div className="absolute top-4 left-4 glass p-2 rounded-lg text-xs">
             <div>Game State: {gameState}</div>
+            <div>Player Turn: {playerTurn}</div>
             <div>Aim Angle: {aimAngle.toFixed(2)}</div>
             <div>Power: {power}</div>
             <div>English: x={english.x.toFixed(2)}, y={english.y.toFixed(2)}</div>
+            <div>Is Mouse Down: {isMouseDownRef.current ? 'Yes' : 'No'}</div>
+            <div>Is Powering Up: {isPoweringUp ? 'Yes' : 'No'}</div>
             {lastShotInfo && (
               <>
                 <div>Last Shot Angle: {lastShotInfo.angle.toFixed(2)}</div>

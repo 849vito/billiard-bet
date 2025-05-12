@@ -1,6 +1,5 @@
-
 import React, { useEffect, useState } from "react";
-import { TABLE_WIDTH, TABLE_HEIGHT } from "@/utils/GamePhysics";
+import { TABLE_WIDTH, TABLE_HEIGHT, BALL_RADIUS } from "@/utils/GamePhysics";
 
 interface CueStickProps {
   aimAngle: number;
@@ -11,12 +10,22 @@ interface CueStickProps {
   isBreakShot?: boolean;
 }
 
-const CueStick = ({ aimAngle, power, position, isPoweringUp, english, isBreakShot = false }: CueStickProps) => {
+const CueStick = ({ 
+  aimAngle, 
+  power, 
+  position, 
+  isPoweringUp, 
+  english,
+  isBreakShot = false
+}: CueStickProps) => {
   const [cueColor, setCueColor] = useState("#B86125"); // Default wood color
   
+  // Calculate ball diameter in pixels for proper offsetting
+  const ballDiameter = BALL_RADIUS * 2;
+  
   // Adjust offset to position cue stick more accurately
-  // Increased offset to ensure there's a visible gap between cue and ball
-  const offset = 30 + (power * 0.7); // Distance from cue ball center
+  // Make sure stick is positioned AWAY from the ball with proper distance
+  const offset = ballDiameter + 10 + (power * 0.7); // Distance from cue ball center
   
   // Render an effect to show English being applied
   const renderEnglishIndicator = () => {
@@ -52,16 +61,16 @@ const CueStick = ({ aimAngle, power, position, isPoweringUp, english, isBreakSho
     }
   }, [power]);
   
-  // Early return if not powering up or position is missing
+  // Only render the cue stick when actually powering up
   if (!isPoweringUp || !position) return null;
   
   // Calculate cue stick position with offset from ball
   // This is crucial - we need to position the cue AWAY from the ball
+  // Use a NEGATIVE cosine/sine to place the cue in the OPPOSITE direction
   const stickX = position.x + Math.cos(aimAngle) * offset;
   const stickY = position.y + Math.sin(aimAngle) * offset;
   
   // Calculate cue stick length based on power for visual feedback
-  // Increased base length to match the reference image
   const cueLength = 35 + power * 0.2; // Percentage of table width
   
   return (
@@ -70,19 +79,20 @@ const CueStick = ({ aimAngle, power, position, isPoweringUp, english, isBreakSho
       <div 
         className="absolute h-3 rounded-full transform origin-right"
         style={{
-          backgroundImage: `linear-gradient(90deg, ${cueColor} 50%, #8B4513 98%)`,
+          backgroundImage: `linear-gradient(90deg, #8B4513 2%, ${cueColor} 50%)`,
           top: `${stickY / TABLE_HEIGHT * 100}%`,
           left: `${stickX / TABLE_WIDTH * 100}%`,
           width: `${cueLength}%`,
+          // Note the opposite rotation (aimAngle + Math.PI) and origin-right
           transform: `translate(0, -50%) rotate(${aimAngle + Math.PI}rad)`,
           zIndex: 20,
           boxShadow: "0 2px 4px rgba(0,0,0,0.5)"
         }}
       >
         {/* Cue decoration rings */}
-        <div className="absolute right-1/4 w-2 h-full bg-white/30 rounded-full"></div>
-        <div className="absolute right-1/3 w-2 h-full bg-white/30 rounded-full"></div>
-        <div className="absolute right-1/2 w-2 h-full bg-white/30 rounded-full"></div>
+        <div className="absolute left-1/4 w-2 h-full bg-white/30 rounded-full"></div>
+        <div className="absolute left-1/3 w-2 h-full bg-white/30 rounded-full"></div>
+        <div className="absolute left-1/2 w-2 h-full bg-white/30 rounded-full"></div>
       </div>
       
       {/* Cue tip */}
@@ -100,7 +110,7 @@ const CueStick = ({ aimAngle, power, position, isPoweringUp, english, isBreakSho
       <div 
         className="absolute h-1.5 transform origin-right"
         style={{
-          background: `linear-gradient(90deg, rgba(255,255,255,0.7), transparent)`,
+          background: `linear-gradient(90deg, transparent, rgba(255,255,255,0.7))`,
           top: `${stickY / TABLE_HEIGHT * 100}%`,
           left: `${stickX / TABLE_WIDTH * 100}%`,
           width: `${power * 0.6}px`,
