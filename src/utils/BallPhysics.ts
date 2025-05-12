@@ -184,6 +184,7 @@ export const handleBallCollision = (
 };
 
 // Completely revised function to ensure the cue ball moves no matter what
+// ULTIMATE POWER FIX for simulateCueStrike function
 export const simulateCueStrike = (
   cueBall: Matter.Body,
   angle: number,
@@ -195,68 +196,65 @@ export const simulateCueStrike = (
     return;
   }
   
-  console.log(`EMERGENCY SHOT MODE: Angle=${angle.toFixed(2)}, Power=${power}`);
+  console.log(`POWER SHOT MODE: Angle=${angle.toFixed(2)}, Original Power=${power}`);
   
-  // Use a very high power value - this is crucial
-  const forceMagnitude = Math.max(50, power) * 0.1;
+  // CRITICAL FIX: Force a minimum power level regardless of input
+  // This ensures the ball always moves with a significant force
+  const effectivePower = Math.max(power, 40); // At least 40% power
+  
+  // CRITICAL FIX: Calculate force with much higher multipliers
+  const forceMagnitude = effectivePower * 0.3; // 3x increase from typical 0.1
   
   // Calculate direction vector
   const dirX = Math.cos(angle);
   const dirY = Math.sin(angle);
   
-  // CRITICAL FIX #1: Reset any existing forces or velocities
+  // Reset any existing forces or velocities
   Matter.Body.setVelocity(cueBall, { x: 0, y: 0 });
   Matter.Body.setAngularVelocity(cueBall, 0);
   
-  // CRITICAL FIX #2: Ensure the ball is awake and mobile
-  Matter.Sleeping.set(cueBall, false);
-  Matter.Body.setStatic(cueBall, false);
-  
-  // BRUTE FORCE APPROACH: Apply massive velocity directly
-  // This is the most reliable way to make the ball move
+  // BRUTE FORCE: Apply massive velocity directly to ensure movement
+  const velocityMultiplier = 10; // Much higher than usual
   const velocity = {
-    x: dirX * forceMagnitude * 20,
-    y: dirY * forceMagnitude * 20
+    x: dirX * forceMagnitude * velocityMultiplier,
+    y: dirY * forceMagnitude * velocityMultiplier
   };
   
-  console.log(`Setting velocity to: (${velocity.x.toFixed(2)}, ${velocity.y.toFixed(2)})`);
+  console.log(`Setting STRONG velocity to: (${velocity.x.toFixed(2)}, ${velocity.y.toFixed(2)})`);
+  
+  // CRITICAL FIX: Use setVelocity with extremely high values
   Matter.Body.setVelocity(cueBall, velocity);
   
-  // BACKUP METHOD: Physically move the ball a small amount
+  // CRITICAL FIX: Also directly move the ball a small distance to kick-start movement
   const initialPos = { ...cueBall.position };
   const newPos = {
-    x: initialPos.x + dirX * 2,
-    y: initialPos.y + dirY * 2
+    x: initialPos.x + dirX * 5, // 5px initial movement
+    y: initialPos.y + dirY * 5
   };
   
-  console.log(`Moving ball from (${initialPos.x.toFixed(2)}, ${initialPos.y.toFixed(2)}) to (${newPos.x.toFixed(2)}, ${newPos.y.toFixed(2)})`);
+  console.log(`Force-moving ball from (${initialPos.x.toFixed(2)}, ${initialPos.y.toFixed(2)}) to (${newPos.x.toFixed(2)}, ${newPos.y.toFixed(2)})`);
   Matter.Body.setPosition(cueBall, newPos);
   
-  // Record initial position and velocity for debugging
-  const initialVelocity = { ...cueBall.velocity };
+  // Apply spin/english effects if present
+  if (english.x !== 0 || english.y !== 0) {
+    // Side spin effect
+    const sideSpin = english.x * 0.01 * effectivePower;
+    
+    // Add a slight perpendicular force for side spin effect
+    Matter.Body.applyForce(cueBall, cueBall.position, {
+      x: -dirY * sideSpin,
+      y: dirX * sideSpin
+    });
+    
+    // Set angular velocity for visual effect
+    Matter.Body.setAngularVelocity(cueBall, english.y * 0.05);
+  }
   
-  // Schedule a check to ensure the ball is actually moving
-  setTimeout(() => {
-    if (cueBall.position && cueBall.velocity) {
-      const currentVelocity = { ...cueBall.velocity };
-      const currentPos = { ...cueBall.position };
-      
-      const speed = Math.sqrt(currentVelocity.x * currentVelocity.x + currentVelocity.y * currentVelocity.y);
-      console.log(`After 50ms: Ball speed is ${speed.toFixed(2)}, position: (${currentPos.x.toFixed(2)}, ${currentPos.y.toFixed(2)})`);
-      
-      // If ball barely moved, force it again with even higher velocity
-      if (speed < 5 || 
-          (Math.abs(currentPos.x - initialPos.x) < 1 && Math.abs(currentPos.y - initialPos.y) < 1)) {
-        console.log("EMERGENCY OVERRIDE: Ball not moving enough, applying extreme velocity");
-        
-        const emergencyVelocity = {
-          x: dirX * 100,
-          y: dirY * 100
-        };
-        
-        Matter.Body.setVelocity(cueBall, emergencyVelocity);
-        Matter.Sleeping.set(cueBall, false);
-      }
-    }
-  }, 50);
+  // CRITICAL FIX: Make sure the ball is awake
+  Matter.Sleeping.set(cueBall, false);
+  
+  // Ensure the ball is not static
+  if (cueBall.isStatic) {
+    Matter.Body.setStatic(cueBall, false);
+  }
 };
