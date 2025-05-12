@@ -60,6 +60,7 @@ export const useBilliardPhysics = (isPracticeMode: boolean = false, props?: UseB
   const containerRef = useRef<HTMLDivElement | null>(null);
   const initialMouseRef = useRef<{ x: number, y: number } | null>(null);
   const currentMouseRef = useRef<{ x: number, y: number } | null>(null);
+  const shotTimerRef = useRef<NodeJS.Timeout | null>(null);
   
   // Game state refs
   const lastPocketedBallRef = useRef<number | null>(null);
@@ -68,6 +69,152 @@ export const useBilliardPhysics = (isPracticeMode: boolean = false, props?: UseB
   const cushionHitRef = useRef(false);
   const firstBallHitRef = useRef<number | null>(null);
   const foulCommittedRef = useRef(false);
+
+  // Simulate opponent's turn (for non-practice mode)
+  const simulateOpponentShot = useCallback(() => {
+    if (!worldRef.current) return;
+    
+    // Find cue ball
+    const cueBall = ballBodiesRef.current.find(ball => ball.label === 'ball-0');
+    if (!cueBall) return;
+    
+    // Find opponent ball type
+    const opponentType = playerType === BallType.SOLID ? BallType.STRIPE : BallType.SOLID;
+    
+    // Find opponent balls
+    const opponentBalls = balls.filter(b => 
+      !b.pocketed && 
+      ((opponentType === BallType.SOLID && b.number > 0 && b.number < 8) ||
+       (opponentType === BallType.STRIPE && b.number > 8))
+    );
+    
+    // Try to target one of opponent's balls or 8-ball if appropriate
+    const targetableBalls = opponentBalls.length > 0 ? opponentBalls : 
+                          balls.filter(b => !b.pocketed && b.number === 8);
+    
+    // If no balls to target, just do a random shot
+    if (targetableBalls.length === 0) {
+      const randomAngle = Math.random() * Math.PI * 2;
+      const randomPower = 30 + Math.random() * 40;
+      
+      const force = {
+        x: Math.cos(randomAngle) * randomPower * 0.05,
+        y: Math.sin(randomAngle) * randomPower * 0.05
+      };
+      
+      // Apply the force
+      Matter.Body.applyForce(cueBall, cueBall.position, force);
+      setGameState('shooting');
+      setMessage("Opponent is shooting...");
+      
+      // Always end opponent's turn after their shot
+      turnEndedRef.current = true;
+      return;
+    }
+    
+    // Select a random target ball
+    const targetBall = targetableBalls[Math.floor(Math.random() * targetableBalls.length)];
+    
+    // Calculate angle to hit the target ball
+    const dx = targetBall.position.x - cueBall.position.x;
+    const dy = targetBall.position.y - cueBall.position.y;
+    const angle = Math.atan2(dy, dx);
+    
+    // Add some random inaccuracy
+    const inaccuracy = (Math.random() - 0.5) * 0.3; // +/- 0.15 radians
+    const finalAngle = angle + inaccuracy;
+    
+    // Calculate power
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    const basePower = Math.min(80, Math.max(30, distance * 0.2)); // Scale power by distance
+    const randomPower = basePower * (0.8 + Math.random() * 0.4); // 80-120% of base power
+    
+    const force = {
+      x: Math.cos(finalAngle) * randomPower * 0.05,
+      y: Math.sin(finalAngle) * randomPower * 0.05
+    };
+    
+    // Apply the force
+    Matter.Body.applyForce(cueBall, cueBall.position, force);
+    setGameState('shooting');
+    setMessage("Opponent is shooting...");
+    
+    // Always end opponent's turn after their shot
+    turnEndedRef.current = true;
+  }, [balls, playerType]);
+  
+  // Enhanced handleShotCompleted function to ensure state transitions properly
+  const handleShotCompleted = useCallback(() => {
+    console.log("SHOT COMPLETED - Transitioning game state");
+    
+    // Reset powering up state - critical fix
+    setIsPoweringUp(false);
+    
+    // Break shot is over
+    if (breakShotRef.current) {
+      breakShotRef.current = false;
+      setIsBreakShot(false);
+      
+      // Check if it was a legal break
+      if (!legalBreak && !isPracticeMode) {
+        setMessage("Illegal break! No balls pocketed or hit cushions.");
+        turnEndedRef.current = true;
+        foulCommittedRef.current = true;
+      }
+    }
+    
+    // Reset shot tracking vars
+    firstBallHitRef.current = null;
+    cushionHitRef.current = false;
+    
+    // CRITICAL FIX: Force transition back to waiting state for practice mode
+    if (isPracticeMode) {
+      console.log("Practice mode - forcing state back to waiting");
+      setMessage("Your turn! Click and hold to power up the shot.");
+      setGameState('waiting');
+    } else {
+      // For regular game mode with turns
+      console.log("Game mode - checking turn end conditions");
+      if (turnEndedRef.current) {
+        setPlayerTurn(prev => prev === 'player' ? 'opponent' : 'player');
+        turnEndedRef.current = false;
+        
+        if (foulCommittedRef.current) {
+          toast.error("Foul committed! Turn passes to opponent.");
+          foulCommittedRef.current = false;
+        }
+        
+        if (playerTurn === 'player') {
+          setGameState('opponent-turn');
+          setMessage("Opponent's turn");
+          
+          // Simulate opponent's turn after delay
+          if (playerTurn === 'player') {
+            setTimeout(() => {
+              simulateOpponentShot();
+            }, 2000);
+          }
+        } else {
+          setGameState('waiting');
+          setMessage("Your turn! Click and hold to power up the shot.");
+        }
+      } else {
+        // Player gets to continue their turn
+        if (playerTurn === 'player') {
+          setGameState('waiting');
+          setMessage("Your turn! Click and hold to power up the shot.");
+        } else {
+          setGameState('opponent-turn');
+          setMessage("Opponent's turn");
+          
+          // Simulate opponent's turn after delay
+          setTimeout(() => {
+            simulateOpponentShot();
+          }, 2000);
+        }
+      }
+    }
+  }, [isPracticeMode, legalBreak, playerTurn, simulateOpponentShot]);
 
   // Setup the physics world
   const initPhysics = useCallback(() => {
@@ -87,6 +234,9 @@ export const useBilliardPhysics = (isPracticeMode: boolean = false, props?: UseB
       }
       if (requestRef.current) {
         cancelAnimationFrame(requestRef.current);
+      }
+      if (shotTimerRef.current) {
+        clearTimeout(shotTimerRef.current);
       }
     }
     
@@ -205,7 +355,7 @@ export const useBilliardPhysics = (isPracticeMode: boolean = false, props?: UseB
       }
     });
     
-    // Update game state based on ball movement
+    // Inside the initPhysics function, modified update interval:
     const updateInterval = setInterval(() => {
       // Check if balls have stopped moving during shooting state
       if (gameState === 'shooting') {
@@ -223,7 +373,7 @@ export const useBilliardPhysics = (isPracticeMode: boolean = false, props?: UseB
           gameState 
         });
         
-        // If all balls stopped or after 5 seconds, complete the shot
+        // If all balls stopped, complete the shot
         if (allStopped) {
           console.log("All balls have stopped - completing shot");
           handleShotCompleted();
@@ -259,8 +409,11 @@ export const useBilliardPhysics = (isPracticeMode: boolean = false, props?: UseB
     
     return () => {
       clearInterval(updateInterval);
+      if (shotTimerRef.current) {
+        clearTimeout(shotTimerRef.current);
+      }
     };
-  }, [gameState, props]);
+  }, [gameState, handlePocketedBall, props]);
   
   // Handle a ball being pocketed
   const handlePocketedBall = useCallback((ballNumber: number) => {
@@ -383,154 +536,8 @@ export const useBilliardPhysics = (isPracticeMode: boolean = false, props?: UseB
     if (isAuthenticated && user && ballNumber > 0) {
       saveShot(true, [ballNumber]);
     }
-  }, [balls, isPracticeMode, playerType, isAuthenticated, user, props]);
+  }, [balls, isPracticeMode, playerType, isAuthenticated, user]);
   
-  // Handle completion of a shot when all balls stop moving
-  const handleShotCompleted = useCallback(() => {
-    console.log("SHOT COMPLETED - Transitioning game state");
-    
-    // Reset powering up state - critical fix
-    setIsPoweringUp(false);
-    
-    // Break shot is over
-    if (breakShotRef.current) {
-      breakShotRef.current = false;
-      setIsBreakShot(false);
-      
-      // Check if it was a legal break
-      if (!legalBreak && !isPracticeMode) {
-        setMessage("Illegal break! No balls pocketed or hit cushions.");
-        turnEndedRef.current = true;
-        foulCommittedRef.current = true;
-      }
-    }
-    
-    // Reset shot tracking vars
-    firstBallHitRef.current = null;
-    cushionHitRef.current = false;
-    
-    // CRITICAL FIX: Force transition back to waiting state for practice mode
-    if (isPracticeMode) {
-      console.log("Practice mode - forcing state back to waiting");
-      setMessage("Your turn! Click and hold to power up the shot.");
-      setGameState('waiting');
-    } else {
-      // For regular game mode with turns
-      console.log("Game mode - checking turn end conditions");
-      if (turnEndedRef.current) {
-        setPlayerTurn(prev => prev === 'player' ? 'opponent' : 'player');
-        turnEndedRef.current = false;
-        
-        if (foulCommittedRef.current) {
-          toast.error("Foul committed! Turn passes to opponent.");
-          foulCommittedRef.current = false;
-        }
-        
-        if (playerTurn === 'player') {
-          setGameState('opponent-turn');
-          setMessage("Opponent's turn");
-          
-          // Simulate opponent's turn after delay
-          if (playerTurn === 'player') {
-            setTimeout(() => {
-              simulateOpponentShot();
-            }, 2000);
-          }
-        } else {
-          setGameState('waiting');
-          setMessage("Your turn! Click and hold to power up the shot.");
-        }
-      } else {
-        // Player gets to continue their turn
-        if (playerTurn === 'player') {
-          setGameState('waiting');
-          setMessage("Your turn! Click and hold to power up the shot.");
-        } else {
-          setGameState('opponent-turn');
-          setMessage("Opponent's turn");
-          
-          // Simulate opponent's turn after delay
-          setTimeout(() => {
-            simulateOpponentShot();
-          }, 2000);
-        }
-      }
-    }
-  }, [isPracticeMode, legalBreak, playerTurn, simulateOpponentShot]);
-  
-  // Simulate opponent's turn (for non-practice mode)
-  const simulateOpponentShot = useCallback(() => {
-    if (!worldRef.current) return;
-    
-    // Find cue ball
-    const cueBall = ballBodiesRef.current.find(ball => ball.label === 'ball-0');
-    if (!cueBall) return;
-    
-    // Find opponent ball type
-    const opponentType = playerType === BallType.SOLID ? BallType.STRIPE : BallType.SOLID;
-    
-    // Find opponent balls
-    const opponentBalls = balls.filter(b => 
-      !b.pocketed && 
-      ((opponentType === BallType.SOLID && b.number > 0 && b.number < 8) ||
-       (opponentType === BallType.STRIPE && b.number > 8))
-    );
-    
-    // Try to target one of opponent's balls or 8-ball if appropriate
-    const targetableBalls = opponentBalls.length > 0 ? opponentBalls : 
-                          balls.filter(b => !b.pocketed && b.number === 8);
-    
-    // If no balls to target, just do a random shot
-    if (targetableBalls.length === 0) {
-      const randomAngle = Math.random() * Math.PI * 2;
-      const randomPower = 30 + Math.random() * 40;
-      
-      const force = {
-        x: Math.cos(randomAngle) * randomPower * 0.05,
-        y: Math.sin(randomAngle) * randomPower * 0.05
-      };
-      
-      // Apply the force
-      Matter.Body.applyForce(cueBall, cueBall.position, force);
-      setGameState('shooting');
-      setMessage("Opponent is shooting...");
-      
-      // Always end opponent's turn after their shot
-      turnEndedRef.current = true;
-      return;
-    }
-    
-    // Select a random target ball
-    const targetBall = targetableBalls[Math.floor(Math.random() * targetableBalls.length)];
-    
-    // Calculate angle to hit the target ball
-    const dx = targetBall.position.x - cueBall.position.x;
-    const dy = targetBall.position.y - cueBall.position.y;
-    const angle = Math.atan2(dy, dx);
-    
-    // Add some random inaccuracy
-    const inaccuracy = (Math.random() - 0.5) * 0.3; // +/- 0.15 radians
-    const finalAngle = angle + inaccuracy;
-    
-    // Calculate power
-    const distance = Math.sqrt(dx * dx + dy * dy);
-    const basePower = Math.min(80, Math.max(30, distance * 0.2)); // Scale power by distance
-    const randomPower = basePower * (0.8 + Math.random() * 0.4); // 80-120% of base power
-    
-    const force = {
-      x: Math.cos(finalAngle) * randomPower * 0.05,
-      y: Math.sin(finalAngle) * randomPower * 0.05
-    };
-    
-    // Apply the force
-    Matter.Body.applyForce(cueBall, cueBall.position, force);
-    setGameState('shooting');
-    setMessage("Opponent is shooting...");
-    
-    // Always end opponent's turn after their shot
-    turnEndedRef.current = true;
-  }, [balls, playerType]);
-
   // Save shot data to Supabase
   const saveShot = async (successful: boolean, ballsPocketed: number[] = []) => {
     if (!isAuthenticated || !user) return;
@@ -609,49 +616,13 @@ export const useBilliardPhysics = (isPracticeMode: boolean = false, props?: UseB
       if (requestRef.current) {
         cancelAnimationFrame(requestRef.current);
       }
+      if (shotTimerRef.current) {
+        clearTimeout(shotTimerRef.current);
+      }
     };
   }, [initPhysics, gameInitialized]);
   
-  // Power up the shot
-  const startPoweringUp = useCallback((x: number, y: number, english: { x: number, y: number } = { x: 0, y: 0 }) => {
-    if (gameState !== 'waiting' || playerTurn !== 'player') return null;
-    
-    setGameState('aiming');
-    setIsPoweringUp(true);
-    setPower(0);
-    
-    // Get position of cue ball
-    const cueBall = balls.find(ball => ball.number === 0 && !ball.pocketed);
-    if (!cueBall) return null;
-    
-    // Calculate angle from cue ball to mouse point
-    const dx = cueBall.position.x - x;
-    const dy = cueBall.position.y - y;
-    const angle = Math.atan2(dy, dx);
-    
-    setAimAngle(angle);
-    initialMouseRef.current = { x, y };
-    currentMouseRef.current = { x, y };
-    setShowTrajectory(true);
-    
-    // Update trajectory
-    updateTrajectory(cueBall.position.x, cueBall.position.y, x, y);
-    
-    // Start power increase interval
-    const powerInterval = setInterval(() => {
-      setPower(prev => {
-        if (prev >= 100) {
-          clearInterval(powerInterval);
-          return 100;
-        }
-        return prev + 2;
-      });
-    }, 50);
-    
-    return powerInterval;
-  }, [balls, gameState, playerTurn]);
-  
-  // Take the shot
+  // Improved takeShot function for power issues
   const takeShot = useCallback((english: { x: number, y: number } = { x: 0, y: 0 }) => {
     console.log("TAKING POWERFUL SHOT - Current power:", power);
     
@@ -711,12 +682,63 @@ export const useBilliardPhysics = (isPracticeMode: boolean = false, props?: UseB
       if (isAuthenticated && user) {
         saveShot(false);
       }
+      
+      // Backup timer to reset game state if physics detection fails
+      if (shotTimerRef.current) {
+        clearTimeout(shotTimerRef.current);
+      }
+      
+      shotTimerRef.current = setTimeout(() => {
+        if (gameState === 'shooting') {
+          console.log("Shot timer expired - forcing completion");
+          handleShotCompleted();
+        }
+      }, 5000); // 5 seconds max shot duration
     };
     
     // Run the shot application immediately to ensure power is captured
     applyPowerfulShot();
-  }, [aimAngle, gameState, isAuthenticated, power, props, user]);
+  }, [aimAngle, gameState, handleShotCompleted, isAuthenticated, power, props, user]);
+  
+  // Power up the shot
+  const startPoweringUp = useCallback((x: number, y: number, english: { x: number, y: number } = { x: 0, y: 0 }) => {
+    if (gameState !== 'waiting' || playerTurn !== 'player') return null;
     
+    setGameState('aiming');
+    setIsPoweringUp(true);
+    setPower(0);
+    
+    // Get position of cue ball
+    const cueBall = balls.find(ball => ball.number === 0 && !ball.pocketed);
+    if (!cueBall) return null;
+    
+    // Calculate angle from cue ball to mouse point
+    const dx = cueBall.position.x - x;
+    const dy = cueBall.position.y - y;
+    const angle = Math.atan2(dy, dx);
+    
+    setAimAngle(angle);
+    initialMouseRef.current = { x, y };
+    currentMouseRef.current = { x, y };
+    setShowTrajectory(true);
+    
+    // Update trajectory
+    updateTrajectory(cueBall.position.x, cueBall.position.y, x, y);
+    
+    // Start power increase interval
+    const powerInterval = setInterval(() => {
+      setPower(prev => {
+        if (prev >= 100) {
+          clearInterval(powerInterval);
+          return 100;
+        }
+        return prev + 2;
+      });
+    }, 50);
+    
+    return powerInterval;
+  }, [balls, gameState, playerTurn]);
+  
   // Update the trajectory line based on aim
   const updateTrajectory = useCallback((startX: number, startY: number, targetX: number, targetY: number) => {
     // Find the cue ball
