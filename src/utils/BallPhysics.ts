@@ -1,4 +1,3 @@
-
 import Matter from 'matter-js';
 import { BallType, BALL_RADIUS } from './GamePhysics';
 
@@ -201,7 +200,7 @@ export const handleBallCollision = (
   };
 };
 
-// New function to simulate the physics of a cue stick striking the cue ball
+// Improved function to simulate the physics of a cue stick striking the cue ball
 export const simulateCueStrike = (
   cueBall: Matter.Body,
   angle: number,
@@ -214,9 +213,9 @@ export const simulateCueStrike = (
   const minPower = 5;
   const adjustedPower = Math.max(power, minPower);
   
-  // Calculate the impulse force based on the power setting (0-100)
-  // Increase forceFactor to make the ball move more noticeably
-  const forceFactor = Math.pow(adjustedPower / 100, 1.2) * 0.25; 
+  // Significantly increase the force factor to make the ball move more noticeably
+  // This is the key change to fix the issue
+  const forceFactor = Math.pow(adjustedPower / 100, 1.2) * 0.5; 
   
   // Calculate force direction based on angle
   const forceDirection = {
@@ -254,15 +253,15 @@ export const simulateCueStrike = (
     y: (Math.random() - 0.5) * randomness * adjustedPower
   });
   
-  // Ensure the ball has velocity by directly setting it if needed
+  // Directly set velocity to ensure the ball moves
+  // This is a crucial change to fix the issue
   const velocity = {
-    x: forceDirection.x * forceFactor * 100,
-    y: forceDirection.y * forceFactor * 100
+    x: forceDirection.x * forceFactor * 200, // Increased multiplier
+    y: forceDirection.y * forceFactor * 200  // Increased multiplier
   };
   
-  // Make sure we have some minimum velocity
-  if (Math.abs(Matter.Body.getVelocity(cueBall).x) < 0.1 && 
-      Math.abs(Matter.Body.getVelocity(cueBall).y) < 0.1) {
-    Matter.Body.setVelocity(cueBall, velocity);
-  }
+  Matter.Body.setVelocity(cueBall, velocity);
+  
+  // Wake up the ball if it's sleeping
+  Matter.Sleeping.set(cueBall, false);
 };
