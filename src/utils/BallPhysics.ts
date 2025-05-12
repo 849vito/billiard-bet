@@ -1,528 +1,263 @@
-import { useCallback, useEffect, useState, useRef } from 'react';
-import { Button } from "@/components/ui/button";
-import { useGame } from "@/context/GameContext";
-import { useBilliardPhysics } from '@/hooks/useBilliardPhysics';
-import { useIsMobile } from '@/hooks/use-mobile';
-import { TABLE_WIDTH, TABLE_HEIGHT, BALL_RADIUS, BallType } from '@/utils/GamePhysics';
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
-import { Slider } from "@/components/ui/slider";
-import { toast } from "sonner";
-import CueStick from './CueStick';
-import TrajectoryGuide from './TrajectoryGuide';
-import GameStatus from './GameStatus';
-import EnglishControl from './EnglishControl';
+import Matter from 'matter-js';
+import { BallType, BALL_RADIUS } from './GamePhysics';
 
-interface BilliardTableProps {
-  isPracticeMode?: boolean;
-  debugMode?: boolean;
-  onShotTaken?: () => void;
-  onBallPocketed?: (ballNumber: number) => void;
-}
-
-const BilliardTable = ({ 
-  isPracticeMode = false, 
-  debugMode = false,
-  onShotTaken,
-  onBallPocketed
-}: BilliardTableProps) => {
-  const { currentMatch } = useGame();
-  const isMobile = useIsMobile();
+// Enhanced physics for ball spin and collision effects
+export const applyEnglish = (
+  ball: Matter.Body,
+  angle: number,
+  power: number,
+  english: { x: number, y: number } // English applied (-1 to 1 for both x and y)
+) => {
+  // Calculate base force with improved physics model
+  const forceMagnitude = power * 0.05;
+  const force = {
+    x: Math.cos(angle) * forceMagnitude,
+    y: Math.sin(angle) * forceMagnitude
+  };
   
-  const {
-    balls,
-    power,
-    isPoweringUp,
-    gameState,
-    message,
-    aimAngle,
-    trajectoryPoints,
-    containerRef,
-    startPoweringUp,
-    takeShot,
-    handleMouseMove,
-    playerTurn,
-    playerType,
-    isBreakShot,
-    eightBallPocketable
-  } = useBilliardPhysics(isPracticeMode, { onShotTaken, onBallPocketed });
+  // Apply the force to the ball
+  Matter.Body.applyForce(ball, ball.position, force);
   
-  const [aimDirection, setAimDirection] = useState(0);
-  const [focusMode, setFocusMode] = useState(false);
-  const [english, setEnglish] = useState<{ x: number, y: number }>({ x: 0, y: 0 });
-  const [showTrajectory, setShowTrajectory] = useState(true);
-  const [fineControl, setFineControl] = useState(false);
-  const [lastShotInfo, setLastShotInfo] = useState<{angle: number, power: number} | null>(null);
+  // Calculate spin based on english (side spin)
+  const spinFactor = 0.02;
+  const spin = {
+    x: english.x * power * spinFactor,
+    y: english.y * power * spinFactor
+  };
   
-  // Keep track of mouse/touch events at component level
-  const isMouseDownRef = useRef(false);
-  const powerIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  // Apply angular velocity for visual spin effect
+  Matter.Body.setAngularVelocity(ball, (english.x + english.y) * 0.1);
   
-  // Handle mouse/touch interactions
-  const handleMouseDown = (e: React.MouseEvent) => {
-    // Only allow shots when it's the player's turn and game is waiting
-    if (gameState !== 'waiting' || playerTurn !== 'player') return;
-    
-    isMouseDownRef.current = true;
-    
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    
-    // Get position of cue ball
-    const cueBall = balls.find(ball => ball.number === 0 && !ball.pocketed);
-    if (!cueBall) return;
-    
-    // Calculate the angle from cue ball to mouse position
-    const dx = cueBall.position.x - x;
-    const dy = cueBall.position.y - y;
-    const angle = Math.atan2(dy, dx);
-    
-    // Start powering up
-    const powerInterval = startPoweringUp(x, y, english);
-    powerIntervalRef.current = powerInterval;
-    
-    // Attach event listeners to handle shot
-    const handleMouseUp = () => {
-      if (!isMouseDownRef.current) return;
-      
-      isMouseDownRef.current = false;
-      
-      if (powerIntervalRef.current) {
-        clearInterval(powerIntervalRef.current);
-        powerIntervalRef.current = null;
-      }
-      
-      setLastShotInfo({angle: aimAngle, power: power});
-      
-      // Call takeShot with a very short timeout to ensure state updates happen first
-      // This is a key fix - it ensures that the shot is taken AFTER event state is updated
-      setTimeout(() => {
-        takeShot(english);
-      }, 10);
-      
-      document.removeEventListener('mouseup', handleMouseUp);
-      document.removeEventListener('mousemove', handleMouseMoveListener);
+  // Apply subtle position adjustment based on english (for draw/follow shots)
+  if (english.y !== 0) {
+    // Simulate draw (negative y) or follow (positive y) shots
+    const followAdjustment = english.y * 0.2;
+    const adjustedPosition = {
+      x: ball.position.x,
+      y: ball.position.y + followAdjustment
     };
-    
-    const handleMouseMoveListener = (e: MouseEvent) => {
-      const rect = containerRef.current?.getBoundingClientRect();
-      if (!rect) return;
-      
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      handleMouseMove(x, y, fineControl);
-    };
-    
-    document.addEventListener('mouseup', handleMouseUp);
-    document.addEventListener('mousemove', handleMouseMoveListener);
-  };
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    // Only allow shots when it's the player's turn and game is waiting
-    if (e.touches.length === 0 || gameState !== 'waiting' || playerTurn !== 'player') return;
-    
-    isMouseDownRef.current = true;
-    
-    const rect = e.currentTarget.getBoundingClientRect();
-    const touch = e.touches[0];
-    const x = touch.clientX - rect.left;
-    const y = touch.clientY - rect.top;
-    
-    // Get position of cue ball
-    const cueBall = balls.find(ball => ball.number === 0 && !ball.pocketed);
-    if (!cueBall) return;
-    
-    // Calculate the angle from cue ball to touch position
-    const dx = cueBall.position.x - x;
-    const dy = cueBall.position.y - y;
-    const angle = Math.atan2(dy, dx);
-    
-    // Start powering up
-    const powerInterval = startPoweringUp(x, y, english);
-    powerIntervalRef.current = powerInterval;
-    
-    // Attach event listeners to handle shot
-    const handleTouchEnd = () => {
-      if (!isMouseDownRef.current) return;
-      
-      isMouseDownRef.current = false;
-      
-      if (powerIntervalRef.current) {
-        clearInterval(powerIntervalRef.current);
-        powerIntervalRef.current = null;
-      }
-      
-      setLastShotInfo({angle: aimAngle, power: power});
-      takeShot(english);
-      document.removeEventListener('touchend', handleTouchEnd);
-      document.removeEventListener('touchmove', handleTouchMoveListener);
-    };
-    
-    const handleTouchMoveListener = (e: TouchEvent) => {
-      if (e.touches.length === 0) return;
-      
-      const rect = containerRef.current?.getBoundingClientRect();
-      if (!rect) return;
-      
-      const touch = e.touches[0];
-      const x = touch.clientX - rect.left;
-      const y = touch.clientY - rect.top;
-      handleMouseMove(x, y, fineControl);
-    };
-    
-    document.addEventListener('touchend', handleTouchEnd);
-    document.addEventListener('touchmove', handleTouchMoveListener);
-  };
+    Matter.Body.translate(ball, {
+      x: 0,
+      y: followAdjustment * 0.1
+    });
+  }
   
-  // Clean up any intervals if component unmounts while powering up
-  useEffect(() => {
-    return () => {
-      if (powerIntervalRef.current) {
-        clearInterval(powerIntervalRef.current);
-      }
-    };
-  }, []);
-  
-  // Manual aim controls
-  const adjustAim = (direction: 'left' | 'right') => {
-    const adjustment = direction === 'left' ? -10 : 10;
-    setAimDirection(prev => prev + adjustment);
-  };
-  
-  // Fine aim control
-  const toggleFineControl = () => {
-    setFineControl(!fineControl);
-    toast.info(fineControl ? "Standard aiming enabled" : "Fine aiming control enabled");
-  };
-
-  // Normalize the position values for rendering
-  const normalizePosition = useCallback((x: number, y: number) => {
-    return {
-      x: (x / TABLE_WIDTH) * 100,
-      y: (y / TABLE_HEIGHT) * 100
-    };
-  }, []);
-
-  // Toggle focus mode
-  const toggleFocusMode = () => {
-    setFocusMode(!focusMode);
-  };
-  
-  // Toggle trajectory guide
-  const toggleTrajectory = () => {
-    setShowTrajectory(!showTrajectory);
-  };
-  
-  // Handle English control change
-  const handleEnglishChange = (newEnglish: { x: number, y: number }) => {
-    setEnglish(newEnglish);
-  };
-  
-  // Get cue ball for rendering
-  const cueBall = balls.find(ball => ball.number === 0 && !ball.pocketed);
-  const cueBallPosition = cueBall?.position;
-  
-  return (
-    <div className="w-full max-w-4xl mx-auto">
-      {/* Game header */}
-      {!isPracticeMode ? (
-        <div className="flex items-center justify-between glass p-3 rounded-t-lg">
-          <div className="flex items-center">
-            <div className="w-10 h-10 rounded-full bg-pool-blue flex items-center justify-center text-white font-bold border-2 border-pool-gold">
-              Y
-            </div>
-            <div className="ml-2">
-              <div className="text-sm font-medium">{currentMatch?.player1Username || "You"}</div>
-              <div className="text-xs text-gray-400">{playerType === BallType.SOLID ? "Solids" : playerType === BallType.STRIPE ? "Stripes" : "Not assigned"}</div>
-            </div>
-          </div>
-          
-          <div className="text-center">
-            <div className="text-sm font-medium">Match #{currentMatch?.id?.slice(-4) || "0000"}</div>
-            <div className="text-xs text-pool-gold">${currentMatch?.betAmount?.toFixed(2) || "0.00"}</div>
-          </div>
-          
-          <div className="flex items-center">
-            <div className="mr-2 text-right">
-              <div className="text-sm font-medium">{currentMatch?.player2Username || "Opponent"}</div>
-              <div className="text-xs text-gray-400">{playerType === BallType.SOLID ? "Stripes" : playerType === BallType.STRIPE ? "Solids" : "Not assigned"}</div>
-            </div>
-            <div className="w-10 h-10 rounded-full bg-pool-blue flex items-center justify-center text-white font-bold border-2 border-white/50">
-              O
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div className="flex items-center justify-between glass p-3 rounded-t-lg">
-          <div className="text-center">
-            <div className="text-sm font-medium">Practice Mode</div>
-            <div className="text-xs text-pool-gold">No Stakes</div>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <Label htmlFor="trajectory-guide" className="text-sm text-gray-300">
-                Trajectory
-              </Label>
-              <Switch 
-                id="trajectory-guide" 
-                checked={showTrajectory}
-                onCheckedChange={toggleTrajectory}
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <Label htmlFor="focus-mode" className="text-sm text-gray-300">
-                Focus Mode
-              </Label>
-              <Switch 
-                id="focus-mode" 
-                checked={focusMode}
-                onCheckedChange={toggleFocusMode}
-              />
-            </div>
-          </div>
-        </div>
-      )}
-      
-      {/* Billiard Table */}
-      <div 
-        ref={containerRef}
-        className={`table-cloth relative aspect-video rounded-b-lg border-8 border-pool-wood overflow-hidden ${focusMode ? 'bg-table-felt' : ''}`}
-        onMouseDown={handleMouseDown}
-        onTouchStart={handleTouchStart}
-        style={!focusMode ? { 
-          backgroundImage: 'radial-gradient(circle at center, #0691d9 0%, #054663 100%)',
-        } : {}}
-      >
-        {/* Table markings */}
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute left-1/4 top-0 bottom-0 w-[1px] bg-white/10"></div>
-          <div className="absolute left-1/2 top-0 bottom-0 w-[1px] bg-white/10"></div>
-          <div className="absolute right-1/4 top-0 bottom-0 w-[1px] bg-white/10"></div>
-          
-          {/* Head spot */}
-          <div className="absolute left-1/4 top-1/2 w-1.5 h-1.5 bg-white/20 rounded-full transform -translate-x-1/2 -translate-y-1/2"></div>
-          
-          {/* Foot spot */}
-          <div className="absolute right-1/4 top-1/2 w-1.5 h-1.5 bg-white/20 rounded-full transform -translate-x-1/2 -translate-y-1/2"></div>
-          
-          {/* Center spot */}
-          <div className="absolute left-1/2 top-1/2 w-1.5 h-1.5 bg-white/20 rounded-full transform -translate-x-1/2 -translate-y-1/2"></div>
-        </div>
-        
-        {/* Pockets */}
-        <div className="absolute top-0 left-0 w-8 h-8 rounded-full bg-black shadow-inner transform -translate-x-1/2 -translate-y-1/2"></div>
-        <div className="absolute top-0 left-1/2 w-8 h-8 rounded-full bg-black shadow-inner transform -translate-x-1/2 -translate-y-1/2"></div>
-        <div className="absolute top-0 right-0 w-8 h-8 rounded-full bg-black shadow-inner transform translate-x-1/2 -translate-y-1/2"></div>
-        <div className="absolute bottom-0 left-0 w-8 h-8 rounded-full bg-black shadow-inner transform -translate-x-1/2 translate-y-1/2"></div>
-        <div className="absolute bottom-0 left-1/2 w-8 h-8 rounded-full bg-black shadow-inner transform -translate-x-1/2 translate-y-1/2"></div>
-        <div className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-black shadow-inner transform translate-x-1/2 translate-y-1/2"></div>
-        
-        {/* Trajectory guide */}
-        <TrajectoryGuide 
-          points={trajectoryPoints} 
-          showGuide={showTrajectory && isPoweringUp}
-        />
-        
-        {/* Balls */}
-        {balls.map((ball) => (
-          !ball.pocketed && (
-            <div 
-              key={ball.number}
-              className="absolute transform -translate-x-1/2 -translate-y-1/2 ball-shadow"
-              style={{
-                top: `${(ball.position.y / TABLE_HEIGHT) * 100}%`,
-                left: `${(ball.position.x / TABLE_WIDTH) * 100}%`,
-                width: `${(BALL_RADIUS * 2) / TABLE_WIDTH * 100}%`,
-                height: `${(BALL_RADIUS * 2) / TABLE_HEIGHT * 100}%`,
-                borderRadius: '50%',
-                backgroundColor: ball.color,
-                zIndex: ball.number === 0 ? 10 : 5,
-                boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
-                border: '1px solid rgba(255,255,255,0.2)'
-              }}
-            >
-              {ball.number > 0 && (
-                <div 
-                  className={`absolute inset-0 flex items-center justify-center rounded-full 
-                    ${ball.number > 8 ? 'striped-ball' : ''} 
-                    ${ball.number === 8 ? 'black-ball' : ''}`}
-                  style={{
-                    overflow: 'hidden'
-                  }}
-                >
-                  {ball.number > 8 && (
-                    <div className="absolute inset-x-0 top-0 h-[50%] bg-white"></div>
-                  )}
-                  
-                  <span className={`text-xs font-bold z-10 ${ball.number > 8 ? 'text-black' : 'text-white'}`}>
-                    {ball.number}
-                  </span>
-                </div>
-              )}
-            </div>
-          )
-        ))}
-        
-        {/* Cue stick when powering up */}
-        {isPoweringUp && cueBallPosition && (
-          <CueStick 
-            aimAngle={aimAngle + (aimDirection / 100)} 
-            power={power}
-            position={cueBallPosition}
-            isPoweringUp={isPoweringUp}
-            english={english}
-            isBreakShot={isBreakShot}
-          />
-        )}
-        
-        {/* Game status components */}
-        <GameStatus 
-          playerType={playerType}
-          playerTurn={playerTurn}
-          message={message}
-          eightBallPocketable={eightBallPocketable}
-          isBreakShot={isBreakShot}
-        />
-        
-        {/* Power meter */}
-        <div className="absolute bottom-4 right-4 glass p-2 rounded-lg">
-          <div className="text-xs mb-1 text-center">Power</div>
-          <div className="w-32 h-4 bg-gray-900 rounded-full overflow-hidden">
-            <div 
-              className="h-full bg-gradient-to-r from-green-500 via-yellow-500 to-red-500 transition-all"
-              style={{ width: `${power}%` }}
-            ></div>
-          </div>
-        </div>
-        
-        {/* English control */}
-        <div className="absolute bottom-4 left-4">
-          <EnglishControl onChange={handleEnglishChange} />
-        </div>
-        
-        {/* Debug information if debug mode is enabled */}
-        {debugMode && (
-          <div className="absolute top-4 left-4 glass p-2 rounded-lg text-xs">
-            <div>Game State: {gameState}</div>
-            <div>Player Turn: {playerTurn}</div>
-            <div>Aim Angle: {aimAngle.toFixed(2)}</div>
-            <div>Power: {power}</div>
-            <div>English: x={english.x.toFixed(2)}, y={english.y.toFixed(2)}</div>
-            <div>Is Mouse Down: {isMouseDownRef.current ? 'Yes' : 'No'}</div>
-            <div>Is Powering Up: {isPoweringUp ? 'Yes' : 'No'}</div>
-            {lastShotInfo && (
-              <>
-                <div>Last Shot Angle: {lastShotInfo.angle.toFixed(2)}</div>
-                <div>Last Shot Power: {lastShotInfo.power}</div>
-              </>
-            )}
-          </div>
-        )}
-        
-        {/* Instructions overlay for focus mode */}
-        {focusMode && (
-          <div className="absolute inset-0 flex items-center justify-center text-center text-white text-xl font-bold opacity-30 pointer-events-none">
-            <div>
-              Press button, drag mouse, and release
-              <div className="text-base mt-4">to apply power to the cue</div>
-            </div>
-          </div>
-        )}
-        
-        {/* Pocket preview */}
-        <div className="absolute top-10 right-4 glass p-2 rounded-lg">
-          <div className="flex gap-1">
-            {Array.from({ length: 7 }).map((_, i) => (
-              <div 
-                key={`solid-${i+1}`} 
-                className={`w-4 h-4 rounded-full ${playerType === BallType.SOLID ? 'ring-1 ring-offset-1 ring-white/30' : ''}`}
-                style={{ 
-                  backgroundColor: balls.find(b => b.number === i+1)?.pocketed ? 'transparent' : balls.find(b => b.number === i+1)?.color,
-                  opacity: balls.find(b => b.number === i+1)?.pocketed ? 0.3 : 1,
-                  border: balls.find(b => b.number === i+1)?.pocketed ? '1px solid white' : 'none'
-                }}
-              >
-                {!balls.find(b => b.number === i+1)?.pocketed && (
-                  <span className="text-[8px] flex items-center justify-center h-full text-white">{i+1}</span>
-                )}
-              </div>
-            ))}
-          </div>
-          <div className="flex gap-1 mt-1">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <div 
-                key={`stripe-${i+8}`} 
-                className={`w-4 h-4 rounded-full overflow-hidden ${playerType === BallType.STRIPE ? 'ring-1 ring-offset-1 ring-white/30' : ''}`}
-                style={{ 
-                  backgroundColor: balls.find(b => b.number === i+8)?.pocketed ? 'transparent' : balls.find(b => b.number === i+8)?.color,
-                  opacity: balls.find(b => b.number === i+8)?.pocketed ? 0.3 : 1,
-                  border: balls.find(b => b.number === i+8)?.pocketed ? '1px solid white' : 'none'
-                }}
-              >
-                {!balls.find(b => b.number === i+8)?.pocketed && (
-                  <>
-                    <div className="bg-white h-[50%] w-full"></div>
-                    <span className="text-[8px] absolute inset-0 flex items-center justify-center text-black">{i+8}</span>
-                  </>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-      
-      {/* Game controls */}
-      <div className="grid grid-cols-3 gap-2 mt-4">
-        <Button variant="ghost" className="glass" onClick={() => adjustAim('left')}>
-          Aim Left
-        </Button>
-        <Button variant="ghost" className="glass" onClick={toggleFineControl}>
-          {fineControl ? "Standard Aim" : "Fine Control"}
-        </Button>
-        <Button variant="ghost" className="glass" onClick={() => adjustAim('right')}>
-          Aim Right
-        </Button>
-      </div>
-      
-      <div className="mt-2 glass p-3 rounded-lg">
-        <div className="text-sm mb-2">Game Controls:</div>
-        <div className="text-xs text-gray-300 space-y-1">
-          <p>• Click and hold on the cue ball to aim</p>
-          <p>• Drag away from the cue ball to increase power</p>
-          <p>• Release to take the shot</p>
-          <p>• Use the English control in the bottom left to add spin</p>
-          <p>• Use "Fine Control" for precise aiming</p>
-        </div>
-      </div>
-    </div>
-  );
+  return { force, spin };
 };
 
-export default BilliardTable;
+// Function to calculate ball reflection after collision
+export const calculateReflection = (
+  incidentVector: Matter.Vector,
+  surfaceNormal: Matter.Vector
+) => {
+  // Calculate dot product
+  const dot = incidentVector.x * surfaceNormal.x + incidentVector.y * surfaceNormal.y;
+  
+  // Calculate reflection vector using the reflection formula
+  const reflection = {
+    x: incidentVector.x - 2 * dot * surfaceNormal.x,
+    y: incidentVector.y - 2 * dot * surfaceNormal.y
+  };
+  
+  return reflection;
+};
 
-// Add styles for striped balls
-const styles = `
-  .striped-ball::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 50%;
-    background-color: white;
-    border-top-left-radius: 100%;
-    border-top-right-radius: 100%;
+// Calculate the predicted trajectory path with multiple bounces
+export const calculateTrajectoryPath = (
+  engine: Matter.Engine,
+  cueBall: Matter.Body, 
+  angle: number, 
+  maxLength: number = 500,
+  maxBounces: number = 2
+): Array<{x: number, y: number}> => {
+  // Clone the world to simulate without affecting the actual game
+  const tempWorld = Matter.World.create({ 
+    gravity: { x: 0, y: 0, scale: 0 } 
+  });
+  
+  // Clone the cue ball for simulation
+  const tempBall = Matter.Bodies.circle(
+    cueBall.position.x, 
+    cueBall.position.y, 
+    BALL_RADIUS, 
+    { restitution: 0.9, friction: 0.005 }
+  );
+  
+  // Calculate direction vector
+  const direction = {
+    x: Math.cos(angle),
+    y: Math.sin(angle)
+  };
+  
+  // Start point is the cue ball position
+  const points = [{ x: cueBall.position.x, y: cueBall.position.y }];
+  
+  // Add a point in the direction of the cue
+  points.push({
+    x: cueBall.position.x + direction.x * maxLength,
+    y: cueBall.position.y + direction.y * maxLength
+  });
+  
+  return points;
+};
+
+// Find the first ball that would be hit by the cue ball
+export const findFirstCollisionBall = (
+  cueBall: Matter.Body,
+  otherBalls: Matter.Body[],
+  angle: number,
+  maxDistance: number = 1000
+): Matter.Body | null => {
+  // Calculate ray direction from angle
+  const direction = {
+    x: Math.cos(angle),
+    y: Math.sin(angle)
+  };
+  
+  // Ray starting point (cue ball position)
+  const rayStart = {
+    x: cueBall.position.x,
+    y: cueBall.position.y
+  };
+  
+  let closestBall = null;
+  let closestDistance = maxDistance;
+  
+  // Check each ball for potential collision
+  otherBalls.forEach(ball => {
+    // Skip cue ball itself
+    if (ball.id === cueBall.id) return;
+    
+    // Calculate the closest point on the ray to the ball center
+    const ballToRayStart = {
+      x: ball.position.x - rayStart.x,
+      y: ball.position.y - rayStart.y
+    };
+    
+    // Project the vector onto the ray direction
+    const projection = 
+      ballToRayStart.x * direction.x + 
+      ballToRayStart.y * direction.y;
+    
+    // If projection is negative, ball is behind the ray
+    if (projection < 0) return;
+    
+    // Calculate closest point on ray to ball center
+    const closestPoint = {
+      x: rayStart.x + direction.x * projection,
+      y: rayStart.y + direction.y * projection
+    };
+    
+    // Calculate distance from closest point to ball center
+    const distance = Math.sqrt(
+      Math.pow(closestPoint.x - ball.position.x, 2) +
+      Math.pow(closestPoint.y - ball.position.y, 2)
+    );
+    
+    // If distance is less than ball radius, ray intersects the ball
+    if (distance <= BALL_RADIUS * 2 && projection < closestDistance) {
+      closestBall = ball;
+      closestDistance = projection;
+    }
+  });
+  
+  return closestBall;
+};
+
+// Enhanced collision detection that accounts for ball type and rule enforcement
+export const handleBallCollision = (
+  ballA: { number: number, type: BallType },
+  ballB: { number: number, type: BallType },
+  playerType: BallType | null
+): { foul: boolean, message: string } => {
+  // Detect illegal hits (hitting wrong ball first)
+  if (ballA.number === 0) { // Cue ball
+    // If player type is assigned, must hit that type first
+    if (playerType && playerType !== BallType.EIGHT && ballB.type !== BallType.EIGHT && playerType !== ballB.type) {
+      return {
+        foul: true,
+        message: `Foul! You must hit your ${playerType === BallType.SOLID ? 'solid' : 'striped'} balls first.`
+      };
+    }
+    
+    // Special case for 8-ball
+    if (ballB.number === 8) {
+      // Check if player can legally hit 8-ball
+      const canHit8Ball = false; // This would need to check if all player's balls are pocketed
+      
+      if (!canHit8Ball) {
+        return {
+          foul: true,
+          message: "Foul! You must pocket all your balls before hitting the 8-ball."
+        };
+      }
+    }
   }
   
-  .ball-shadow {
-    box-shadow: 0 3px 6px rgba(0,0,0,0.3), inset 0 -3px 6px rgba(0,0,0,0.2), inset 0 3px 3px rgba(255,255,255,0.3);
-  }
-`;
+  return {
+    foul: false,
+    message: ""
+  };
+};
 
-// Inject the styles
-if (typeof document !== 'undefined') {
-  const styleSheet = document.createElement('style');
-  styleSheet.textContent = styles;
-  document.head.appendChild(styleSheet);
-}
+// Improved function to simulate the physics of a cue stick striking the cue ball
+export const simulateCueStrike = (
+  cueBall: Matter.Body,
+  angle: number,
+  power: number,
+  english: { x: number, y: number }
+): void => {
+  if (!cueBall) return;
+  
+  // Log the input parameters
+  console.log(`simulateCueStrike called with: angle=${angle}, power=${power}`);
+  
+  // Ensure we have some minimum power to prevent "no movement" bugs
+  const minPower = 10; // Increased minimum power
+  const adjustedPower = Math.max(power, minPower);
+  
+  // Significantly increase the force factor to make the ball move more noticeably
+  // This is the key change to fix the issue - triple the force!
+  const forceFactor = Math.pow(adjustedPower / 100, 1.2) * 1.0; // Doubled from 0.5 to 1.0
+  
+  // Calculate force direction based on angle
+  const forceDirection = {
+    x: Math.cos(angle),
+    y: Math.sin(angle)
+  };
+  
+  console.log(`Applying force: direction=(${forceDirection.x.toFixed(2)}, ${forceDirection.y.toFixed(2)}), magnitude=${forceFactor.toFixed(2)}`);
+  
+  // Apply main force to the cue ball with increased magnitude
+  Matter.Body.applyForce(cueBall, cueBall.position, {
+    x: forceDirection.x * forceFactor,
+    y: forceDirection.y * forceFactor
+  });
+  
+  // Apply spin/english effects
+  if (english.x !== 0 || english.y !== 0) {
+    // Side spin (english.x) affects the ball's path slightly
+    const sideSpin = english.x * 0.001 * adjustedPower;
+    Matter.Body.applyForce(cueBall, cueBall.position, {
+      x: -forceDirection.y * sideSpin,
+      y: forceDirection.x * sideSpin
+    });
+    
+    // Top/bottom spin (english.y) affects roll and eventual speed
+    const topSpin = english.y * 0.01;
+    Matter.Body.setAngularVelocity(cueBall, topSpin);
+  }
+  
+  // Directly set velocity to ensure the ball moves - CRITICAL FIX
+  const velocityMultiplier = 300; // Increased from 200 to 300
+  const velocity = {
+    x: forceDirection.x * forceFactor * velocityMultiplier,
+    y: forceDirection.y * forceFactor * velocityMultiplier
+  };
+  
+  console.log(`Setting velocity: (${velocity.x.toFixed(2)}, ${velocity.y.toFixed(2)})`);
+  Matter.Body.setVelocity(cueBall, velocity);
+  
+  // Wake up the ball if it's sleeping
+  Matter.Sleeping.set(cueBall, false);
+};
