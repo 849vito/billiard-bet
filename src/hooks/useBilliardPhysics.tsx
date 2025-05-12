@@ -672,62 +672,65 @@ export const useBilliardPhysics = (isPracticeMode: boolean = false, props?: UseB
   
   // Take the shot
   const takeShot = useCallback((english: { x: number, y: number } = { x: 0, y: 0 }) => {
-    // Important: Always reset isPoweringUp first
+    console.log("takeShot called with gameState:", gameState);
+    
+    // Always reset isPoweringUp immediately
     setIsPoweringUp(false);
     
-    // Add debug logging to track what's happening
-    console.log('Taking shot. Game state:', gameState, 'isPoweringUp:', isPoweringUp);
-    
-    // Check if we're in a valid state to take a shot
-    if (gameState !== 'aiming') {
-      console.log('Not in aiming state, cannot take shot');
-      // Make sure to update game state back to waiting if we're not shooting
-      setGameState('waiting');
-      return;
-    }
-    
-    // Clear any remaining references
+    // Clear any pending power intervals for safety
     initialMouseRef.current = null;
     currentMouseRef.current = null;
     
-    // Set shooting state
-    setShowTrajectory(false);
-    setGameState('shooting');
-    
-    // Find cue ball
-    const cueBall = ballBodiesRef.current.find(ball => ball.label === 'ball-0');
-    if (!cueBall || !worldRef.current) {
-      console.error('Could not find cue ball!');
+    // If we're not in aiming state, we can't take a shot
+    if (gameState !== 'aiming') {
+      console.log("Not in aiming state, cannot take shot");
       setGameState('waiting');
       return;
     }
     
-    // Use the calculated angle from aiming
-    const angle = aimAngle;
+    // Set shooting state BEFORE finding the ball to avoid race conditions
+    setShowTrajectory(false);
+    setGameState('shooting');
     
-    // Apply the shot with significantly increased force
-    console.log('Applying force to ball with angle:', angle, 'power:', power);
-    // Call the simulateCueStrike function with increased power
-    simulateCueStrike(cueBall, angle, power * 1.5, english);
+    // Execute this with a tiny delay to ensure state changes are processed
+    setTimeout(() => {
+      // Find cue ball
+      const cueBall = ballBodiesRef.current.find(ball => ball.label === 'ball-0');
+      if (!cueBall || !worldRef.current) {
+        console.error('Could not find cue ball for shot!');
+        setGameState('waiting');
+        return;
+      }
+      
+      console.log("Taking shot with:", { 
+        angle: aimAngle, 
+        power: power, 
+        english: english,
+        ballPosition: cueBall.position
+      });
+      
+      // Apply the shot with increased power
+      simulateCueStrike(cueBall, aimAngle, power * 2.0, english); // Double the power
+      
+      setMessage(`Shot taken with ${power}% power!`);
+      
+      // Callback when a shot is taken
+      if (props?.onShotTaken) {
+        props.onShotTaken();
+      }
+      
+      // Save shot to Supabase if authenticated
+      if (isAuthenticated && user) {
+        saveShot(false);
+      }
+      
+      setPower(0);
+      
+      // Clear trajectory
+      setTrajectoryPoints([]);
+    }, 20); // Slight delay to ensure state updates are processed
+  }, [aimAngle, gameState, isAuthenticated, power, props, user]);
     
-    setMessage(`Shot taken with ${power}% power!`);
-    
-    // Callback when a shot is taken
-    if (props?.onShotTaken) {
-      props.onShotTaken();
-    }
-    
-    // Save shot to Supabase if authenticated
-    if (isAuthenticated && user) {
-      saveShot(false);
-    }
-    
-    setPower(0);
-    
-    // Clear trajectory
-    setTrajectoryPoints([]);
-  }, [aimAngle, gameState, isPoweringUp, isAuthenticated, power, props, user]);
-  
   // Update the trajectory line based on aim
   const updateTrajectory = useCallback((startX: number, startY: number, targetX: number, targetY: number) => {
     // Find the cue ball
