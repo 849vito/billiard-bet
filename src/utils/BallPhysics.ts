@@ -183,7 +183,6 @@ export const handleBallCollision = (
   };
 };
 
-// Completely revised function to ensure the cue ball moves no matter what
 // ULTIMATE POWER FIX for simulateCueStrike function
 export const simulateCueStrike = (
   cueBall: Matter.Body,
