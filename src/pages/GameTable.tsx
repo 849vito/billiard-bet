@@ -1,4 +1,3 @@
-
 import { useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import TopNavigation from "@/components/TopNavigation";
@@ -45,6 +44,9 @@ const GameTable = () => {
     navigate("/dashboard");
   };
 
+  // Debug mode for easier troubleshooting
+  const debugMode = true;
+
   if (!currentMatch) {
     return (
       <div className="min-h-screen flex flex-col">
@@ -75,7 +77,18 @@ const GameTable = () => {
             </Button>
           </div>
           
-          <BilliardTable />
+          {/* Added debug mode to see helpful information */}
+          <BilliardTable debugMode={debugMode} />
+          
+          <div className="mt-4 p-4 bg-black/20 rounded-lg text-white">
+            <h3 className="text-lg font-medium mb-2">How to Play:</h3>
+            <ol className="list-decimal ml-5 space-y-1">
+              <li>Click and hold on the cue ball to aim</li>
+              <li>Drag away from the cue ball to increase power</li>
+              <li>Release to take the shot</li>
+              <li>Use the English control for spin effects</li>
+            </ol>
+          </div>
         </div>
       </main>
     </div>

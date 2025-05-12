@@ -1,5 +1,4 @@
-
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { TABLE_WIDTH, TABLE_HEIGHT } from "@/utils/GamePhysics";
 
 interface CueStickProps {
@@ -12,8 +11,10 @@ interface CueStickProps {
 
 const CueStick = ({ aimAngle, power, position, isPoweringUp, english }: CueStickProps) => {
   const [cueColor, setCueColor] = useState("#B86125"); // Default wood color
+  
   // Adjust offset to position cue stick more accurately
-  const offset = 30 + (power * 0.5); // Distance from cue ball center
+  // Increased offset to ensure there's a visible gap between cue and ball
+  const offset = 30 + (power * 0.7); // Distance from cue ball center
   
   // Render an effect to show English being applied
   const renderEnglishIndicator = () => {
@@ -52,6 +53,7 @@ const CueStick = ({ aimAngle, power, position, isPoweringUp, english }: CueStick
   if (!isPoweringUp || !position) return null;
   
   // Calculate cue stick position with offset from ball
+  // This is crucial - we need to position the cue AWAY from the ball
   const stickX = position.x - Math.cos(aimAngle) * offset;
   const stickY = position.y - Math.sin(aimAngle) * offset;
   
@@ -107,7 +109,7 @@ const CueStick = ({ aimAngle, power, position, isPoweringUp, english }: CueStick
       
       {renderEnglishIndicator()}
       
-      {/* Break Shot Indicator - Similar to what's shown in the reference image */}
+      {/* Only show Break Shot Indicator during the break shot */}
       <div
         className="absolute flex items-center justify-center bg-blue-800 px-4 py-1.5 rounded-full text-white text-sm"
         style={{
