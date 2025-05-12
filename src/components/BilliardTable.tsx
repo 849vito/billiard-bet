@@ -1,3 +1,4 @@
+
 import { useCallback, useEffect, useState, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { useGame } from "@/context/GameContext";
@@ -44,7 +45,8 @@ const BilliardTable = ({
     playerTurn,
     playerType,
     isBreakShot,
-    eightBallPocketable
+    eightBallPocketable,
+    setIsPoweringUp
   } = useBilliardPhysics(isPracticeMode, { onShotTaken, onBallPocketed });
   
   const [aimDirection, setAimDirection] = useState(0);

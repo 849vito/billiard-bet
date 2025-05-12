@@ -831,6 +831,7 @@ export const useBilliardPhysics = (isPracticeMode: boolean = false, props?: UseB
     balls,
     power,
     isPoweringUp,
+    setIsPoweringUp,  // Expose this function so BilliardTable can use it
     gameState,
     message,
     aimAngle,
@@ -843,7 +844,7 @@ export const useBilliardPhysics = (isPracticeMode: boolean = false, props?: UseB
     showTrajectory,
     playerType,
     playerTurn,
-    resetGame,
+    resetGame: initPhysics,  // Using initPhysics as resetGame for simplicity
     eightBallPocketable,
     isBreakShot
   };
