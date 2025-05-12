@@ -44,18 +44,21 @@ export const setupTable = () => {
   const Engine = Matter.Engine;
   const World = Matter.World;
   const Bodies = Matter.Bodies;
-  const Body = Matter.Body;
-  const Composite = Matter.Composite;
   
-  // Create engine and world
+  // Create engine and world with optimized settings for billiards
   const engine = Engine.create({
-    enableSleeping: true,
-    timing: { timeScale: 1 }
+    enableSleeping: false, // CRITICAL: Disable sleeping for billiards
+    timing: { 
+      timeScale: 1.0, // Normal time scale
+      delta: 1000/60, // 60 FPS
+      correction: 1 // Full correction
+    }
   });
-  engine.gravity.y = 0; // No gravity in pool
   
-  // Adjust air friction for more realistic rolling effect
-  engine.world.gravity.scale = 0;
+  // No gravity in pool
+  engine.gravity.scale = 0;
+  engine.gravity.x = 0;
+  engine.gravity.y = 0;
   
   // Create table boundaries (cushions)
   const cushions = [
