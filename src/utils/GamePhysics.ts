@@ -282,10 +282,16 @@ export const calculateShotVector = (
 
 // Function to check if all balls have stopped moving
 export const allBallsStopped = (balls: Matter.Body[]): boolean => {
+  // If no balls, consider them stopped
+  if (balls.length === 0) return true;
+  
+  // Check each ball's velocity
   return balls.every(ball => {
     const velocity = ball.velocity;
     const speed = Math.sqrt(velocity.x * velocity.x + velocity.y * velocity.y);
-    return speed < 0.1;
+    
+    // Use a higher threshold (1.0 instead of 0.1) to consider balls stopped sooner
+    return speed < 1.0;
   });
 };
 
