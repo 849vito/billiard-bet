@@ -207,13 +207,25 @@ export const useBilliardPhysics = (isPracticeMode: boolean = false, props?: UseB
     
     // Update game state based on ball movement
     const updateInterval = setInterval(() => {
+      // Check if balls have stopped moving during shooting state
       if (gameState === 'shooting') {
-        const allStopped = allBallsStopped(ballBodiesRef.current.filter(ball => {
-          // Only consider balls that are still in the world
+        // Filter active balls (not pocketed)
+        const activeBalls = ballBodiesRef.current.filter(ball => {
           return worldRef.current?.bodies.includes(ball);
-        }));
+        });
         
+        // Check if all balls have stopped
+        const allStopped = allBallsStopped(activeBalls);
+        
+        console.log("Checking if balls stopped:", { 
+          allStopped, 
+          ballCount: activeBalls.length,
+          gameState 
+        });
+        
+        // If all balls stopped or after 5 seconds, complete the shot
         if (allStopped) {
+          console.log("All balls have stopped - completing shot");
           handleShotCompleted();
         }
       }
@@ -234,7 +246,7 @@ export const useBilliardPhysics = (isPracticeMode: boolean = false, props?: UseB
           return ball;
         });
       });
-    }, 16); // 60fps update interval
+    }, 100); // Increased from 16ms to 100ms for better performance
     
     // Start the physics engine
     const runner = Matter.Runner.create();
@@ -375,6 +387,8 @@ export const useBilliardPhysics = (isPracticeMode: boolean = false, props?: UseB
   
   // Handle completion of a shot when all balls stop moving
   const handleShotCompleted = useCallback(() => {
+    console.log("SHOT COMPLETED - Transitioning game state");
+    
     // Reset powering up state - critical fix
     setIsPoweringUp(false);
     
@@ -391,51 +405,18 @@ export const useBilliardPhysics = (isPracticeMode: boolean = false, props?: UseB
       }
     }
     
-    // Check for fouls: wrong ball hit first
-    if (firstBallHitRef.current !== null && playerType !== null) {
-      const firstBallType = firstBallHitRef.current < 8 ? BallType.SOLID : 
-                         firstBallHitRef.current > 8 ? BallType.STRIPE : BallType.EIGHT;
-                         
-      const expectedType = playerType;
-      
-      // Check if 8-ball is allowed to be hit
-      const solidsRemaining = balls.filter(b => b.number > 0 && b.number < 8 && !b.pocketed).length;
-      const stripesRemaining = balls.filter(b => b.number > 8 && !b.pocketed).length;
-      const canHit8Ball = (playerType === BallType.SOLID && solidsRemaining === 0) ||
-                        (playerType === BallType.STRIPE && stripesRemaining === 0);
-                        
-      // Set 8-ball pocketable state
-      setEightBallPocketable(canHit8Ball);
-      
-      // Check for wrong ball hit first
-      if (firstBallHitRef.current === 8 && !canHit8Ball) {
-        setMessage("Foul! Hit 8-ball first before clearing your balls.");
-        turnEndedRef.current = true;
-        foulCommittedRef.current = true;
-      } else if (firstBallType !== expectedType && firstBallHitRef.current !== 8) {
-        // Don't consider it a foul on break shot
-        if (!breakShotRef.current) {
-          setMessage(`Foul! Hit wrong ball type first. You must hit ${expectedType === BallType.SOLID ? 'solids' : 'stripes'} first.`);
-          turnEndedRef.current = true;
-          foulCommittedRef.current = true;
-        }
-      }
-    } else if (firstBallHitRef.current === null && !isPracticeMode) {
-      // No ball was hit - foul
-      setMessage("Foul! No ball was hit.");
-      turnEndedRef.current = true;
-      foulCommittedRef.current = true;
-    }
-    
     // Reset shot tracking vars
     firstBallHitRef.current = null;
     cushionHitRef.current = false;
     
+    // CRITICAL FIX: Force transition back to waiting state for practice mode
     if (isPracticeMode) {
+      console.log("Practice mode - forcing state back to waiting");
       setMessage("Your turn! Click and hold to power up the shot.");
       setGameState('waiting');
     } else {
-      // Check if turn should end
+      // For regular game mode with turns
+      console.log("Game mode - checking turn end conditions");
       if (turnEndedRef.current) {
         setPlayerTurn(prev => prev === 'player' ? 'opponent' : 'player');
         turnEndedRef.current = false;
@@ -475,7 +456,7 @@ export const useBilliardPhysics = (isPracticeMode: boolean = false, props?: UseB
         }
       }
     }
-  }, [balls, isPracticeMode, legalBreak, playerTurn, playerType, props]);
+  }, [isPracticeMode, legalBreak, playerTurn, simulateOpponentShot]);
   
   // Simulate opponent's turn (for non-practice mode)
   const simulateOpponentShot = useCallback(() => {
