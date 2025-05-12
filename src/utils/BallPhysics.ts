@@ -1,3 +1,4 @@
+// This should be in /src/utils/BallPhysics.ts
 import Matter from 'matter-js';
 import { BallType, BALL_RADIUS } from './GamePhysics';
 
@@ -32,10 +33,6 @@ export const applyEnglish = (
   if (english.y !== 0) {
     // Simulate draw (negative y) or follow (positive y) shots
     const followAdjustment = english.y * 0.2;
-    const adjustedPosition = {
-      x: ball.position.x,
-      y: ball.position.y + followAdjustment
-    };
     Matter.Body.translate(ball, {
       x: 0,
       y: followAdjustment * 0.1
@@ -43,23 +40,6 @@ export const applyEnglish = (
   }
   
   return { force, spin };
-};
-
-// Function to calculate ball reflection after collision
-export const calculateReflection = (
-  incidentVector: Matter.Vector,
-  surfaceNormal: Matter.Vector
-) => {
-  // Calculate dot product
-  const dot = incidentVector.x * surfaceNormal.x + incidentVector.y * surfaceNormal.y;
-  
-  // Calculate reflection vector using the reflection formula
-  const reflection = {
-    x: incidentVector.x - 2 * dot * surfaceNormal.x,
-    y: incidentVector.y - 2 * dot * surfaceNormal.y
-  };
-  
-  return reflection;
 };
 
 // Calculate the predicted trajectory path with multiple bounces
@@ -70,19 +50,6 @@ export const calculateTrajectoryPath = (
   maxLength: number = 500,
   maxBounces: number = 2
 ): Array<{x: number, y: number}> => {
-  // Clone the world to simulate without affecting the actual game
-  const tempWorld = Matter.World.create({ 
-    gravity: { x: 0, y: 0, scale: 0 } 
-  });
-  
-  // Clone the cue ball for simulation
-  const tempBall = Matter.Bodies.circle(
-    cueBall.position.x, 
-    cueBall.position.y, 
-    BALL_RADIUS, 
-    { restitution: 0.9, friction: 0.005 }
-  );
-  
   // Calculate direction vector
   const direction = {
     x: Math.cos(angle),
@@ -263,19 +230,6 @@ export const simulateCueStrike = (
   console.log(`SHOOTING: Applying force (${force.x.toFixed(2)}, ${force.y.toFixed(2)}) at point (${forcePoint.x.toFixed(2)}, ${forcePoint.y.toFixed(2)})`);
   Matter.Body.applyForce(cueBall, forcePoint, force);
   
-  // Third method - use setVelocity again after a short delay
-  setTimeout(() => {
-    if (cueBall && cueBall.position) {
-      console.log(`SHOOTING: Checking velocity after 10ms: (${cueBall.velocity.x.toFixed(2)}, ${cueBall.velocity.y.toFixed(2)})`);
-      
-      // If velocity is very low, force it again
-      if (Math.abs(cueBall.velocity.x) < 1 && Math.abs(cueBall.velocity.y) < 1) {
-        console.log(`SHOOTING: Ball not moving, forcing velocity again`);
-        Matter.Body.setVelocity(cueBall, velocity);
-      }
-    }
-  }, 10);
-  
   // Apply spin/english effects
   if (english.x !== 0 || english.y !== 0) {
     // Side spin (english.x) affects the ball's path slightly
@@ -298,7 +252,6 @@ export const simulateCueStrike = (
     position: (${cueBall.position.x.toFixed(2)}, ${cueBall.position.y.toFixed(2)})
     velocity: (${cueBall.velocity.x.toFixed(2)}, ${cueBall.velocity.y.toFixed(2)})
     speed: ${Math.sqrt(cueBall.velocity.x * cueBall.velocity.x + cueBall.velocity.y * cueBall.velocity.y).toFixed(2)}
-    angle: ${Math.atan2(cueBall.velocity.y, cueBall.velocity.x).toFixed(2)}
     isStatic: ${cueBall.isStatic}
     isSleeping: ${cueBall.isSleeping}
   `);
