@@ -319,10 +319,12 @@ export const useBilliardPhysics = (isPracticeMode: boolean = false, props?: UseB
         
         // In practice mode, don't switch turns
         if (isPracticeMode) {
+          setGameState('waiting');
           setMessage("Your turn again!");
         } else {
           // Switch turns
           setPlayerTurn('opponent');
+          setGameState('opponent-turn');
           setMessage("Opponent's turn");
         }
       }, 1500);
@@ -373,6 +375,9 @@ export const useBilliardPhysics = (isPracticeMode: boolean = false, props?: UseB
   
   // Handle completion of a shot when all balls stop moving
   const handleShotCompleted = useCallback(() => {
+    // Reset powering up state - critical fix
+    setIsPoweringUp(false);
+    
     // Break shot is over
     if (breakShotRef.current) {
       breakShotRef.current = false;
@@ -628,22 +633,30 @@ export const useBilliardPhysics = (isPracticeMode: boolean = false, props?: UseB
   
   // Power up the shot
   const startPoweringUp = useCallback((x: number, y: number, english: { x: number, y: number } = { x: 0, y: 0 }) => {
-    if (gameState !== 'waiting' || playerTurn !== 'player') return;
+    if (gameState !== 'waiting' || playerTurn !== 'player') return null;
     
     setGameState('aiming');
     setIsPoweringUp(true);
     setPower(0);
+    
+    // Get position of cue ball
+    const cueBall = balls.find(ball => ball.number === 0 && !ball.pocketed);
+    if (!cueBall) return null;
+    
+    // Calculate angle from cue ball to mouse point
+    const dx = cueBall.position.x - x;
+    const dy = cueBall.position.y - y;
+    const angle = Math.atan2(dy, dx);
+    
+    setAimAngle(angle);
     initialMouseRef.current = { x, y };
     currentMouseRef.current = { x, y };
     setShowTrajectory(true);
     
-    // Find the cue ball
-    const cueBall = ballBodiesRef.current.find(ball => ball.label === 'ball-0');
-    if (!cueBall || !engineRef.current) return;
-    
-    // Calculate the initial trajectory
+    // Update trajectory
     updateTrajectory(cueBall.position.x, cueBall.position.y, x, y);
     
+    // Start power increase interval
     const powerInterval = setInterval(() => {
       setPower(prev => {
         if (prev >= 100) {
@@ -655,27 +668,32 @@ export const useBilliardPhysics = (isPracticeMode: boolean = false, props?: UseB
     }, 50);
     
     return powerInterval;
-  }, [gameState, playerTurn]);
+  }, [balls, gameState, playerTurn]);
   
   // Take the shot
   const takeShot = useCallback((english: { x: number, y: number } = { x: 0, y: 0 }) => {
-    if (gameState !== 'aiming' || !initialMouseRef.current || !currentMouseRef.current) return;
+    // Important: Check if we're in aiming state before proceeding
+    if (gameState !== 'aiming' || !initialMouseRef.current) {
+      // Reset the isPoweringUp state if we're not actually taking a shot
+      setIsPoweringUp(false); 
+      return;
+    }
     
+    // Properly set states for shooting
     setIsPoweringUp(false);
     setShowTrajectory(false);
     setGameState('shooting');
     
     // Find cue ball
     const cueBall = ballBodiesRef.current.find(ball => ball.label === 'ball-0');
-    if (!cueBall || !worldRef.current) return;
+    if (!cueBall || !worldRef.current) {
+      // If we couldn't find the cue ball, reset the state
+      setGameState('waiting');
+      return;
+    }
     
-    const start = initialMouseRef.current;
-    const end = currentMouseRef.current;
-    
-    // Calculate the angle from mouse direction
-    const dx = start.x - end.x;
-    const dy = start.y - end.y;
-    const angle = Math.atan2(dy, dx);
+    // Use the calculated angle from aiming
+    const angle = aimAngle;
     
     // Call the simulateCueStrike function properly
     simulateCueStrike(cueBall, angle, power, english);
@@ -700,7 +718,7 @@ export const useBilliardPhysics = (isPracticeMode: boolean = false, props?: UseB
     
     // Clear trajectory
     setTrajectoryPoints([]);
-  }, [gameState, power, props, isAuthenticated, user]);
+  }, [aimAngle, gameState, isAuthenticated, power, props, user]);
   
   // Update the trajectory line based on aim
   const updateTrajectory = useCallback((startX: number, startY: number, targetX: number, targetY: number) => {
@@ -786,14 +804,16 @@ export const useBilliardPhysics = (isPracticeMode: boolean = false, props?: UseB
     currentMouseRef.current = { x: adjustedX, y: adjustedY };
     
     // Calculate angle for rendering cue stick
-    const dx = initialMouseRef.current.x - adjustedX;
-    const dy = initialMouseRef.current.y - adjustedY;
+    const cueBall = balls.find(b => b.number === 0 && !b.pocketed);
+    if (!cueBall) return;
+    
+    const dx = cueBall.position.x - adjustedX;
+    const dy = cueBall.position.y - adjustedY;
     const angle = Math.atan2(dy, dx);
     
     setAimAngle(angle);
     
     // Update trajectory
-    const cueBall = balls.find(b => b.number === 0 && !b.pocketed);
     if (cueBall) {
       updateTrajectory(cueBall.position.x, cueBall.position.y, adjustedX, adjustedY);
     }
@@ -831,7 +851,6 @@ export const useBilliardPhysics = (isPracticeMode: boolean = false, props?: UseB
     balls,
     power,
     isPoweringUp,
-    setIsPoweringUp,  // Expose this function so BilliardTable can use it
     gameState,
     message,
     aimAngle,
@@ -844,7 +863,7 @@ export const useBilliardPhysics = (isPracticeMode: boolean = false, props?: UseB
     showTrajectory,
     playerType,
     playerTurn,
-    resetGame: initPhysics,  // Using initPhysics as resetGame for simplicity
+    resetGame,
     eightBallPocketable,
     isBreakShot
   };
